@@ -56,3 +56,7 @@ tbd
 ## Prize
 
 * wer bekommt was wann?
+
+## How to submit
+
+tbd
