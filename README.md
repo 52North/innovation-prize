@@ -2,7 +2,7 @@
 
 The 52°North Student Innovation Prize has a long history of creative concepts
 developed and implemented by students. In previous iterations, we have kept the technology
-areas open to cover many different aspects and problems in the geoinformation world. 
+areas open to cover many different aspects and problems in the geoinformation/GeoIT world. 
 For this year's iterations we have decided to take a different path and provide
 a pre-defined problem statement while allowing students to be creative in the area
 of solution development.
