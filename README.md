@@ -1,4 +1,4 @@
-# 52°North Student Innovation Challenge 2024
+# 52°North Student Innovation Challenge 2024 - win 3.000 EUR for a succesful PoC!
 
 The 52°North Student Innovation Prize has a long history of creative concepts
 developed and implemented by students. In previous iterations, we have kept the technology
