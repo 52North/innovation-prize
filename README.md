@@ -11,7 +11,7 @@ of solution development.
 
 We identified a problem that affects all of 52°North's research areas: **searchability in
 Research and Spatial Data Infrastructures** (RDI/SDI). Search functionality in such systems
-is generally limited to a metadata-based approach. However, grospatial data - whether vector or raster based -
+is generally limited to a metadata-based approach. However, geospatial data - whether vector or raster based -
 provide a lot of interesting data that currently can only be identified by
 looking at the individual dataset. The challenge of this year's Innovation Prize is to
 develop a concept and a possible implementation that allows searching within datasets of/and RDI/SDI, 
