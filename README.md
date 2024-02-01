@@ -1,15 +1,13 @@
-# 52°North Student Innovation Challenge 2024 - win 3.000 EUR for a succesful PoC!
+# 52°North Student Innovation Challenge 2024 - win 2.500 EUR for a succesful PoC!
 
-The 52°North Student Innovation Prize has a long history of creative concepts
-developed and implemented by students. In previous iterations, we have kept the technology
-areas open to cover many different aspects and problems in the geoinformation/GeoIT world. 
-For this year's iterations we have decided to take a different path and provide
-a pre-defined problem statement while allowing students to be creative in the area
-of solution development.
+The 52°North Student Innovation Prize has a long history of creative concepts developed and implemented by students. 
+This year we provide a pre-defined problem statement while allowing students to be creative in the area of solution development.
+
+TBD project is software development...
 
 ## Problem statement
 
-We identified a problem that affects all of 52°North's research areas: **searchability in
+We have identified a problem that addresses the pain points of **searchability in
 Research and Spatial Data Infrastructures** (RDI/SDI). Search functionality in such systems
 is generally limited to a metadata-based approach. However, geospatial data - whether vector or raster based -
 provide a lot of interesting data that currently can only be identified by
@@ -43,26 +41,30 @@ https://github.com/52North/innovation-prize/issues
 
 ## Timeline
 
-tbd
+Proposal phase: February 15 - April 15, 2024
+Notification of selected proposals: April 30, 2024 
+Implementation phase: June 1 - August 30, 2024
+
 
 ## Conditions for applications
 
-tbd
+* Student: You must be enrolled as a BSc, MSc, or PhD student. 
+* Workload: We expect a workload of about 180 hrs. 
+* Availability: Make sure you can allocate the appropriate amount of time to complete the project.
 
-* must be a student - BSC, MSC???
-* availability
-* work full time in the expected schedule
 
 ## Prize
 
-* wer bekommt was wann?
-
 52°North invites students of Geoinformatics, Informatics or related fields to submit a proposal that outlines the project idea, emphasizes its innovative quality and convincingly describes its feasibility, practical use and market relevance, as well as expected outcome. 
-The top two proposals are then invited to implement a proof-of-concept. In the case of successful completion of the projects (including a proof-of-concept) the following awards will be granted:
-* 1st prize: 3000,- EUR
-* 2nd prize: 2000.- EUR
+The top two proposals are then invited to implement a proof-of-concept. In the case of successful completion of the projects (including a proof-of-concept) we will grant the proposal(s) 2.500,- EUR.
 
 
 ## How to submit
 
-tbd
+The challenge is to compose a project proposal and implement a proof of concept which addresses searchability in Research and Spatial Data Infrastructures (RDI/SDI). The proposal should be approximately 5 pages (2500 words) written in English or German. The following criteria apply. It must:
+* describe the problem statement in your own words
+* provide a description of your concept 
+* describe the project goals 
+* describe the proposed solution – technical approach & feasibility, implementation 
+* include a work plan/road map/implementation plan.
+
