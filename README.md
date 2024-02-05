@@ -41,9 +41,9 @@ https://github.com/52North/innovation-prize/issues
 
 ## Timeline
 
-Proposal phase: February 15 - April 15, 2024
-Notification of selected proposals: April 30, 2024 
-Implementation phase: June 1 - August 30, 2024
+* Proposal phase: February 15 - April 15, 2024
+* Notification of selected proposals: April 30, 2024 
+* Implementation phase: June 1 - August 31, 2024
 
 
 ## Conditions for applications
@@ -59,7 +59,7 @@ Implementation phase: June 1 - August 30, 2024
 The top two proposals are then invited to implement a proof-of-concept. In the case of successful completion of the projects (including a proof-of-concept) we will grant the proposal(s) 2.500,- EUR.
 
 
-## How to submit
+## How/What to submit
 
 The challenge is to compose a project proposal and implement a proof of concept which addresses searchability in Research and Spatial Data Infrastructures (RDI/SDI). The proposal should be approximately 5 pages (2500 words) written in English or German. The following criteria apply. It must:
 * describe the problem statement in your own words
@@ -67,4 +67,9 @@ The challenge is to compose a project proposal and implement a proof of concept 
 * describe the project goals 
 * describe the proposed solution – technical approach & feasibility, implementation 
 * include a work plan/road map/implementation plan.
+
+*see the guidelines
+
+_The innovation prize is sponsored by 52°North GmbH, con terra GmbH, Esri Deutschland GmbH, the Institute for Geoinformatics at the University of Muenster and the Faculty of Geo-Information Science and Earth Observation (ITC) of the University of Twente. 
+These institutions work together to promote research and education in the field of Geoinformatics._
 
