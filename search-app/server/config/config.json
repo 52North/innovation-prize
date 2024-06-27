@@ -1,0 +1,7 @@
+{
+    "OPENAI_API_KEY": "",
+    "TAVILY_API_KEY": "",
+    "pygeoapi_instances": [
+        "https://api.weather.gc.ca/"
+    ]
+}
