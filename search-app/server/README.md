@@ -3,6 +3,7 @@
 ## Project description
 ...
 ### Component Overview
+<img src="../assets/Server_Architecture.png" width=70% height=70%>
 
 ## Installation
 
