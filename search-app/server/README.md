@@ -7,6 +7,10 @@ Install the LangChain CLI if you haven't yet
 ```bash
 pip install -U langchain-cli
 ```
+## Configuration
+:warning: This app must be configured in order to work properly.
+There are a few steps required:
+(1) Add API-keys to the [config file](./config/config.json)
 
 ## Adding packages
 
@@ -45,7 +49,7 @@ export LANGCHAIN_PROJECT=<your-project>  # if not specified, defaults to "defaul
 ## Launch LangServe
 
 ```bash
-langchain serve
+langchain serve --port=8000
 ```
 
 ## Running in Docker
