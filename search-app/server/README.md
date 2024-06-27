@@ -1,4 +1,8 @@
-# search-app-server
+# Geospatial Data Search App
+
+## Project description
+...
+### Component Overview
 
 ## Installation
 
@@ -6,6 +10,24 @@ Install the LangChain CLI if you haven't yet
 
 ```bash
 pip install -U langchain-cli
+```
+## Configuration
+:warning: This app must be configured in order to work properly.
+There are a few steps required:
+1. **Add API-keys** (e.g. OPENAI-API-KEY) to the [config file](./config/config.json)
+2. **Add connectors**: So far, it is possible to connect to a pygeoapi instance and then index collections of the instance. To add a pygeoapi instance, An entry is necessary in the  [config file](./config/config.json) like: ```"pygeoapi_instances": 
+["https://api.weather.gc.ca/", 
+...]```
+4. **Index collections of pygeoapi instance**: To enable contextual search, you need to first index the collections from the specified pygeoapi instance. This is done using a local vector store called ([ChromaDB](https://docs.trychroma.com/)). Once the collections are indexed, the retrieval module performs a semantic search on the indexed metadata.
+To start the indexing process, the app provides an endpoint: ```GET /fetch_documents```. By calling this endpoint, the app synchronizes with the pygeoapi instances specified in the config file. A record manager is used to prevent duplicate entries in the index and to remove indexed documents that are no longer available from the pygeoapi server. 
+
+## Launch Application
+```bash
+# Go to the directory
+cd search-app/server
+
+# launch application
+langchain serve --port=8000
 ```
 
 ## Adding packages
@@ -28,24 +50,6 @@ Note: you remove packages by their api path
 
 ```bash
 langchain app remove my/custom/path/rag
-```
-
-## Setup LangSmith (Optional)
-LangSmith will help us trace, monitor and debug LangChain applications. 
-You can sign up for LangSmith [here](https://smith.langchain.com/). 
-If you don't have access, you can skip this section
-
-
-```shell
-export LANGCHAIN_TRACING_V2=true
-export LANGCHAIN_API_KEY=<your-api-key>
-export LANGCHAIN_PROJECT=<your-project>  # if not specified, defaults to "default"
-```
-
-## Launch LangServe
-
-```bash
-langchain serve
 ```
 
 ## Running in Docker
