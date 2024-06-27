@@ -1,4 +1,8 @@
-# search-app-server
+# Geospatial Data Search App
+
+## Project description
+...
+### Component Overview
 
 ## Installation
 
