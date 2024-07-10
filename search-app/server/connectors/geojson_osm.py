@@ -65,10 +65,17 @@ class GeoJSON():
                 # Todo: Maybe add filename to the properties of each feature
 
         self.features = self._filter_meaningful_features(gj_files, tag_name)
-        self.tag_name = tag_name
+        """
+        feature_collection = geojson.FeatureCollection(self.features)
+        with open(f'{file_dir[0]}local_file.geojson', 'w') as f:
+            geojson.dump(feature_collection, f)
+        """
 
+        self.tag_name = tag_name
+    
     def _filter_meaningful_features(self, features: List[dict], tag_name: str) -> List[dict]:
-        return [feature for feature in features if tag_name in feature.get("properties", {})]
+        filtered_features = list(filter(lambda feature: feature.get("properties", {}).get(tag_name) != "yes", features))
+        return filtered_features
 
     async def _get_osm_tag_description_async(self, tag, semaphore) -> str:
         tag_url = tag.replace(':', '%3A').replace('=', '%3D')
