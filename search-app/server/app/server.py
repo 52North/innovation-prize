@@ -7,7 +7,13 @@ from langchain_core.runnables import chain
 from config.config import Config
 from indexing.indexer import Indexer
 from connectors.pygeoapi_retriever import PyGeoAPI
+from connectors.geojson_osm import GeoJSON
 from langchain_core.runnables.graph import MermaidDrawMethod
+from langchain.schema import Document
+from typing import List
+import geojson
+import json
+
 import logging
 
 logging.basicConfig()
@@ -30,6 +36,16 @@ indexes = {
     "pygeoapi": Indexer(index_name="pygeoapi"),
 }
 
+# Add indexer for local geojson with OSM features
+local_file_indexer = Indexer(index_name="geojson", 
+                             score_treshold=0.4, 
+                             k = 100,
+                             #use_hf_model=True,
+                             #embedding_model="ellenhp/osm2vec-bert-v1"
+                            )
+# Add connection to local file including building features 
+# Replace the value for tag_name argument if you have other data 
+local_file_connector = GeoJSON(tag_name="building")
 
 @chain
 def call_graph(query: str):
@@ -60,11 +76,45 @@ async def fetch_documents(indexing: bool=True):
         }
     }
 
+@app.get("/index_local_files")
+async def index_local_files():
+    # await local_file_connector.add_descriptions_to_features()
+    feature_docs = await local_file_connector._features_to_docs()
+    res_local = local_file_indexer._index(documents=feature_docs)
+    return res_local
+
+def generate_combined_feature_collection(doc_list: List[Document]):
+    features = []
+    for doc in doc_list:
+        if "feature" in doc.metadata:
+            feature = geojson.Feature(geometry=json.loads(doc.metadata["feature"]), properties=doc.metadata)
+            features.append(feature)
+        
+        elif "features" in doc.metadata:
+            feature_collection = geojson.loads(doc.metadata['features'])
+            feature_list = list(feature_collection['features'])
+            features.extend(feature_list)
+
+    combined_feature_collection  = geojson.FeatureCollection(features)
+    geojson_str = geojson.dumps(combined_feature_collection, sort_keys=True, indent=2)
+
+    return geojson_str
+
+@app.get("/retrieve_geojson")
+async def retrieve_geojson(query: str):
+    features = local_file_indexer.retriever.invoke(query)
+
+    return generate_combined_feature_collection(features)
+
+
 @app.get("/clear_index")
 async def clear_index(index_name: str):
-    if index_name not in indexes:
+    if index_name not in (indexes, 'geojson'):
         raise HTTPException(status_code=400, detail="Invalid index name")
-    indexes[index_name]._clear()
+    elif index_name == 'geojson':
+       local_file_indexer._clear()
+    else: 
+        indexes[index_name]._clear()
     return {'message': 'Index cleared'}
 
 @app.get("/retrieve_with_id")
