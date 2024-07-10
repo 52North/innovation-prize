@@ -3,5 +3,8 @@
     "TAVILY_API_KEY": "",
     "pygeoapi_instances": [
         "https://api.weather.gc.ca/"
+    ],
+    "local_files": [
+        "./data/"
     ]
 }
