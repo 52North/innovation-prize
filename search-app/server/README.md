@@ -30,6 +30,18 @@ cd search-app/server
 # launch application
 langchain serve --port=8000
 ```
+## API Endpoints
+- Once the server is launched, a Swagger documentation is generated on ```<server-ip>:8000/docs```.
+- :warning: Due to the Pydantic version used by Langserve, OpenAPI docs for `invoke`, `batch`, `stream`, `stream_log` endpoints will not be generated. API endpoints and playground should work as expected. If you need to see the docs, you can downgrade to Pydantic 1. For example, `pip install pydantic==1.10.13`. See [this issue](https://github.com/tiangolo/fastapi/issues/10360) for details.
+- The endpoints not included in the Swagger docs are:
+    - ```/data/invoke``` => Conversational module (search for data with chat)
+        ```bash
+        curl -X POST http://<server-ip>:8000/data/invoke -H "Content-Type: application/json" -d '{"input": "Your query here"}'
+        ```
+    - ```/retrieve_pygeoapi/invoke``` => Execute retrieval module without chat functionality
+        ```bash
+        curl -X POST http://<server-ip>:8000/retrieve_pygeoapi/invoke -H "Content-Type: application/json" -d '{"input": "Your query here"}'
+        ```
 
 ## Adding packages
 
