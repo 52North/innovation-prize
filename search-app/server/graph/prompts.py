@@ -1,165 +1,76 @@
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.prompts import PromptTemplate
-from langchain_core.pydantic_v1 import BaseModel, Field
-from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 
-# Define your desired data structure.
-class SearchDict(BaseModel):
-    spatial: str = Field(description="Get the spatial context. Can be a location or place or a region")
-    thematic: str = Field(description="Get the thematic context. E.g. 'precipitation' or 'extreme weather'. It can also be the data type, such as 'administrative unit', or 'land use classification'")
-    temporal: str = Field(description="Get the temporal context. must be a certain time period (e.g. 2010-2020) or a certain year, month or a time reference (e.g. last decade, this year) ")
+def generate_conversation_prompt():
+    system_prompt =  """
+    **AI Instructions:**
 
-### Analyze the spatial context in the query:
-class SpatialContext(BaseModel):
-    spatial_entities: str = Field(description="Get the spatial context. Can be a location or place or a region")
-    spatial_scale: str = Field(description="Get the spatial scale (Local, City, Regional, National, Continental, Global")
+    1. **Extract Search Criteria:** Identify the specific type of environmental or geospatial data the user is requesting.
+    2. **Refine the Search:** If the request is vague, ask follow-up questions about the time period, geographic area, resolution, or format to gather more details. Only re-ask maximum of 3 times per inquery and try to ask as less as possible.
+    3. **Contextual Responses:** Keep track of the conversation context to use previous responses in refining the search.
+    4. **Generate Search Query:** Once enough details are gathered, create a search string that combines all specified criteria.
 
-### Analyze the spatial context in the query:
-class OffTopic(BaseModel):
-    off_topic: str = Field(description="yes or no. Decision of whether the user prompt is off-topic or not")
-    off_topic_answer: str = Field(description="answer in case the topic is off-topic")
+    'You must always output a JSON object with an "answer" key and a "search_criteria" key.' 
+    If you have the impression that the user gives the go to search, do not ask follow-up questions and add a flag "ready_to_retrieve": "yes".
 
 
-def generate_off_topic_answer():
-        # follow_up generator
-    parser = JsonOutputParser(pydantic_object=OffTopic)
-    answer_prompt = PromptTemplate(
-        template="""
-        You assist users in finding environmental datasets. Based on the user input you recieve, you have to decide if the user wants to chat about data or not.
-        If the user wants to chat about any other topic not related to environmental, climate or geospatial topics, please politely 
-        point to the user that you can only assist in finding data or metadata. This can also be chitchat like 'hello, how are you?'
-        Please output the decision (off_topic: yes/no) and, if yes, an answer.
+    **Example Conversations:**
 
-        \n{format_instructions}\n{input}\n""",
-        input_variables=["input"],
-        partial_variables={"format_instructions": parser.get_format_instructions()},
+    **Example 1:**
+
+    **User:** "I need environmental/geospatial datasets."
+
+    **Assistant:** "Sure, I can help you find environmental or geospatial datasets. Could you please provide more details about what specific type of data you're looking for? For example, are you interested in climate data, land use data, topographic data, or something else?"
+
+    **Example 2:**
+
+    **User:** "I need precipitation data."
+
+    **Assistant:** "Great, you're looking for precipitation data. To narrow down the search and provide you with the most relevant datasets, it would be helpful to know if you have any specific requirements. For instance, could you specify the time period or geographic area of interest? You might also want to indicate the resolution or format of the data if applicable."
+
+    **User:** "2020"
+
+    **Assistant:** "Thank you. You mentioned you're looking for precipitation data for the year 2020. Is there a particular geographic area you're interested in, such as a specific country, region, or city?"
+
+    **User:** "Europe"
+
+    **Assistant:** "Got it. You're looking for precipitation data for Europe in the year 2020. I will generate a search query based on this information."
+
+    **Generating Search Query:** "precipitation data Europe 2020"
+
+    **Example 3:**
+
+    **User:** "I need land use data."
+
+    **Assistant:** "Sure, you're looking for land use data. Could you please specify if there's a particular region or time period you're interested in? Additionally, do you need this data at a specific resolution or in a particular format?"
+
+    **User:** "North America, last decade"
+
+    **Assistant:** "Understood, you need land use data for North America over the last decade. Is there any specific format or resolution you prefer?"
+
+    **User:** "High resolution"
+
+    **Assistant:** "Thank you for providing more details. I'll generate a search query for high-resolution land use data for North America over the last decade."
+
+    **Generating Search Query:** "high resolution land use data North America 2010-2020"
+    """
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                system_prompt,
+            ),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{input}"),
+        ],
     )
-    return answer_prompt, parser
-
-def generate_search_criteria_prompt():
-    # Set up a parser + inject instructions into the prompt template.
-    parser = JsonOutputParser(pydantic_object=SearchDict)
-    prompt = PromptTemplate(
-        template="""
-        Extract the the spatio-temporal features of the query.
-        If no information is provided, never make it up or halucinate a value to any of the keys in the search_dict.
-        In case you don't have a value for any values, just write a empty string.
-
-        ***important system note***: Please use double quotation marks ("") when generating the keys and values of the dict instead of single quotation marks ('').
-
-        \n{format_instructions}\n{input}\n""",
-        input_variables=["input"],
-        partial_variables={"format_instructions": parser.get_format_instructions()},
-    )
-    return prompt, parser
 
 
-def generate_follow_up_prompt():
-        # follow_up generator
-    follow_up_prompt = PromptTemplate(
-        template="""
-        You recieve a dict including search_criteria (search_dict). Please ask the user to provide more information for the keys that are missing in the dict.
-        Please do not reference the search_dict as the user does not know about this (it is only used in the background). Formulate a short answer in natural language
+    return prompt
 
-        Here is the search_dict: {search_dict}
-        Answer: """,
-        input_variables=["search_dict"]
-    )
-    return follow_up_prompt
-
-
-def generate_temporal_dim_prompt():
-    # Find out if layer has temporal dimension:
-    # use few-shot learning here
-    temporal_prompt = PromptTemplate(
-        template="""
-        You recieve a query for environmental data and need to find out if the desired data has a temporal dimension.
-        Answer with 'yes' or 'no'to indicate whether temporal dimension is included in the required data.
-
-        Here are samples of data WITH temporal dimension:
-        * Event-based data: e.g. precipitation, droughts, floodings
-        * Time series data: e.g. river levels, climate projections
-        * Seasonal data: e.g. heat days in summer months
-        * Historical data: e.g. observational data from weather stations
-        * Real-time data: e.g. sensor data
-        * Remote sensing data: e.g. satellite imagery
-
-        Here are samples of data WITHOUT temporal dimension
-        * Topographic data: e.g Digital Evalation Model
-        * Political Boundaries: e.g. administrative units
-        * Landcover data: e.g. landuse information
-        * Geological data: e.g. soil type maps
-        * Socio-economic data: e.g. GDP and employment statistics
-        * Transportation data: e.g. road networks and traffic patterns
-
-        Here is the query: {query}
-
-        Answer:""", 
-        input_variables=["query"]
-        )
-    return temporal_prompt
-
-def generate_spatial_prompt():
-    # Set up a parser + inject instructions into the prompt template.
-    spatial_parser = JsonOutputParser(pydantic_object=SpatialContext)
-
-    spatial_prompt = PromptTemplate(
-        template="""
-        Extract spatial entities and determine the spatial scale ("Local", "City", "Regional", "National", "Continental", "Global") from the given query.
-
-        Output:
-        1. Spatial Entities
-        2. Spatial Scale
-
-        Examples:
-        Example 1:
-        - Query: "Datasets for temperature variations in Berlin"
-        - Output:
-        1. Spatial Entities: Berlin
-        2. Spatial Scale: City
-
-        Example 2:
-        - Query: "Climate change datasets for Europe"
-        - Output:
-        1. Spatial Entities: Europe
-        2. Spatial Scale: Continental
-
-        Example 3:
-        - Query: "Soil moisture datasets for California and Nevada"
-        - Output:
-        1. Spatial Entities: California, Nevada
-        2. Spatial Scale: Regional
-
-        Example 4:
-        - Query: "Global air quality datasets"
-        - Output:
-        1. Spatial Entities: Global
-        2. Spatial Scale: Global
-
-        Example 5:
-        - Query: "Datasets on water quality in the Mississippi River Basin"
-        - Output:
-        1. Spatial Entities: Mississippi River Basin
-        2. Spatial Scale: Regional
-
-        Guidelines:
-        - Spatial entities: cities, regions, countries, continents, geographic features.
-        - Determine the scale based on the entities' extent:
-        - Local: Locations within a city.
-        - City: Individual cities.
-        - Regional: Multiple cities or parts of a country.
-        - National: Entire countries.
-        - Continental: Entire continents.
-        - Global: Worldwide or multiple continents.
-
-        \n{format_instructions}\n{query}\n""",
-        input_variables=["query"],
-        partial_variables={"format_instructions": spatial_parser.get_format_instructions()}
-    )
-    return spatial_prompt
 
 def generate_final_answer_prompt():
-    ### Generate final answer
-    # Prompt
     final_answer_prompt = PromptTemplate(
         template="""
         You are an assistant for question-answering tasks. 

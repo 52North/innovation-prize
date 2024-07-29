@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 import asyncio
 from fastapi.responses import RedirectResponse
 from langserve import add_routes
-from graph.graph import SpatialRetrieverGraph, GraphState
+from graph.graph import SpatialRetrieverGraph, State
 from langchain_core.runnables import chain
 from config.config import Config
 from indexing.indexer import Indexer
@@ -10,6 +10,9 @@ from connectors.pygeoapi_retriever import PyGeoAPI
 from connectors.geojson_osm import GeoJSON
 from langchain_core.runnables.graph import MermaidDrawMethod
 from langchain.schema import Document
+from langchain_core.messages import HumanMessage, AIMessage
+from fastapi.middleware.cors import CORSMiddleware
+from graph.actions import memory
 from typing import List
 import geojson
 import json
@@ -19,17 +22,26 @@ import logging
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
+# Define the origins that should be allowed to make requests to your API
+origins = [
+    "http://localhost:5173",  # Frontend app origin
+]
+
+
 config = Config('./config/config.json')
 
 # Init graph-app
-graph = SpatialRetrieverGraph(GraphState).compile()
+memory.clear()
+graph = SpatialRetrieverGraph(State(messages=[], search_criteria="", search_results=[], ready_to_retrieve="")).compile()
 
+"""
 # Generate a visualization of the current dialog-module workflow
 graph_visualization = graph.get_graph().draw_mermaid_png(
     draw_method=MermaidDrawMethod.API,
 )
 with open("./graph/current_workflow.png", "wb") as f:
     f.write(graph_visualization)
+"""
 
 # Create a dictionary of indexes
 indexes = {
@@ -39,7 +51,7 @@ indexes = {
 # Add indexer for local geojson with OSM features
 local_file_indexer = Indexer(index_name="geojson", 
                              score_treshold=0.4, 
-                             k = 100,
+                             k = 20,
                              #use_hf_model=True,
                              #embedding_model="ellenhp/osm2vec-bert-v1"
                             )
@@ -47,12 +59,24 @@ local_file_indexer = Indexer(index_name="geojson",
 # Replace the value for tag_name argument if you have other data 
 local_file_connector = GeoJSON(tag_name="building")
 
+
 @chain
 def call_graph(query: str):
-    return graph.invoke(input={"query": query})
+    # return graph.invoke(input={"query": query})
+    print("-#-#--Running graph")
+    inputs = {"messages": [HumanMessage(content=query)]}
+    response = graph.invoke(inputs)
+    return response
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 @app.get("/")
 async def redirect_root_to_docs():
     return RedirectResponse("/docs")
