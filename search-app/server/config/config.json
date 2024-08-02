@@ -1,6 +1,7 @@
 {
     "OPENAI_API_KEY": "",
     "TAVILY_API_KEY": "",
+    "SDSA_API_KEY": "demo-api-key",
     "pygeoapi_instances": [
         "https://webais.demo.52north.org/pygeoapi"
     ],
