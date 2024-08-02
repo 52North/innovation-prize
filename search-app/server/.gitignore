@@ -1,1 +1,12 @@
 __pycache__
+
+# Ignore the large SQLite database file
+search-app/server/chroma_db/chroma.sqlite3
+
+# Ignore all .sqlite3 files in case there are others
+*.sqlite3
+
+# Ignore other common large file types
+*.log
+*.zip
+*.tar.gz
