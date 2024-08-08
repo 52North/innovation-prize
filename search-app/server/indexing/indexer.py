@@ -25,7 +25,8 @@ class Indexer():
 
         if use_hf_model:
             model_name = self.embedding_model
-            model_kwargs = {'device': 'cpu'}
+            model_kwargs = {'device': 'cpu',
+                            'trust_remote_code': True}
             encode_kwargs = {'normalize_embeddings': False}
             hf = HuggingFaceEmbeddings(
                 model_name=model_name,

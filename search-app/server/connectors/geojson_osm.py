@@ -6,14 +6,21 @@ from langchain.schema import Document
 import glob
 import asyncio
 import aiohttp
+import requests
 from bs4 import BeautifulSoup
 from tqdm.asyncio import tqdm
 import json
+import re 
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 config = Config('./config/config.json')
+
+def is_url(string):
+    # Regex pattern for matching URLs
+    pattern = re.compile(r'^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$')
+    return re.match(pattern, string) is not None
 
 class GeoJSON():
     """
@@ -52,26 +59,47 @@ class GeoJSON():
         _features_to_docs() -> List[Document]: 
             Converts features into a list of Document objects for further use.
     """
-    def __init__(self, file_dir: str = None, tag_name: str = "building"):
-        if file_dir is None:
-            file_dir = config.local_files
-        logging.info(f"Looking for files in following dir: {file_dir[0]}")
-        gj_files = []
-        for file in glob.glob(f"{file_dir[0]}*.geojson"):
-            logging.info(f"Extracting features from file: {file}")
-            with open(file) as f:
-                gj = geojson.load(f)
-                gj_files.extend(gj['features'])
-                # Todo: Maybe add filename to the properties of each feature
+    def __init__(self, file_dir: str = None, tag_name: str = "building"):        
+        if file_dir and is_url(file_dir):
+            """We assume the online resource to be a collection published via a PyGeoAPI instance"""
+            logging.info("Getting features from online resource")
+            params = {"f": "json", "limit": 10000}
+            gj = self._fetch_features_from_online_resource(file_dir, params)
+            print(f"Retrieved {len(gj)} features")
 
-        self.features = self._filter_meaningful_features(gj_files, tag_name)
-        """
-        feature_collection = geojson.FeatureCollection(self.features)
-        with open(f'{file_dir[0]}local_file.geojson', 'w') as f:
-            geojson.dump(feature_collection, f)
-        """
+            self.features =  self._filter_meaningful_features(gj, tag_name)
+        else:
+            if not file_dir:
+                file_dir = config.local_files
+            logging.info(f"Looking for files in following dir: {file_dir[0]}")
+            gj_files = []
+            for file in glob.glob(f"{file_dir[0]}*.geojson"):
+                logging.info(f"Extracting features from file: {file}")
+                with open(file) as f:
+                    gj = geojson.load(f)
+                    gj_files.extend(gj['features'])
+                    # Todo: Maybe add filename to the properties of each feature
 
+            self.features = self._filter_meaningful_features(gj_files, tag_name)
+
+        logging.info(f"Recieved {len(self.features)} features")
         self.tag_name = tag_name
+
+    def _fetch_features_from_online_resource(self, url, params):
+        offset = 0
+        all_features = []
+
+        while True:
+            params['offset'] = offset
+            response = requests.get(url, params=params)
+            response_json = response.json()
+            features = response_json.get('features', [])
+            if not features:
+                break
+            all_features.extend(features)
+            offset += params['limit']
+
+        return all_features
     
     def _filter_meaningful_features(self, features: List[dict], tag_name: str) -> List[dict]:
         filtered_features = list(filter(lambda feature: feature.get("properties", {}).get(tag_name) != "yes", features))
@@ -107,6 +135,7 @@ class GeoJSON():
         return dict(zip(tasks.keys(), descriptions))
 
     async def add_descriptions_to_features(self) -> None:
+        logging.info(f"Fetching descriptions for {len(self.features)} OSM features")
         tag_description_map = await self._get_descriptions_for_tags()
         
         for feature in self.features:
@@ -160,7 +189,7 @@ class GeoJSON():
             properties = feature['properties']
             name = properties.get("name", "Unknown")
             description = self._get_feature_description(feature)
-            page_content = f"Feature Name: {name}\n\n{description}"
+            page_content = f"Name: {name}\n\n{description}"
             metadata = {
                 "type": properties.get(self.tag_name, "Unknown"),
                 "feature": json.dumps(feature["geometry"] , indent=2),
@@ -177,7 +206,7 @@ class GeoJSON():
         tag_docs = []
         for tag, features in grouped_features.items():
             tag_description = features[0]['properties'].get('description', tag.replace('=', ': '))
-            page_content = f"Feature Type: {tag_description}\n\nThis collection includes {len(features)} features of type {tag}."
+            page_content = f"{tag}: {tag_description}\n\nThis collection includes {len(features)} features of type {tag}."
             metadata = {
                 "tag": tag,
                 "count": len(features),

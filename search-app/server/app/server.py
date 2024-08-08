@@ -69,16 +69,22 @@ indexes = {
 }
 
 # Add indexer for local geojson with OSM features
-local_file_indexer = Indexer(index_name="geojson", 
-                             score_treshold=0.4, 
+geojson_osm_indexer = Indexer(index_name="geojson", 
+                             score_treshold=-400.0, 
                              k = 20,
-                             #use_hf_model=True,
-                             #embedding_model="ellenhp/osm2vec-bert-v1"
+                             use_hf_model=True,
+                             embedding_model="Alibaba-NLP/gte-large-en-v1.5"
                             )
+
+
 # Add connection to local file including building features 
 # Replace the value for tag_name argument if you have other data 
-local_file_connector = GeoJSON(tag_name="building")
+geojson_osm_connector = GeoJSON(tag_name="building")
 
+"""
+local_file_connector = GeoJSON(file_dir="https://webais.demo.52north.org/pygeoapi/collections/dresden_buildings/items",
+                               tag_name="building")
+"""
 
 app = FastAPI()
 
@@ -179,11 +185,12 @@ async def fetch_documents(indexing: bool=True, api_key: APIKey = Depends(get_api
         }
     }
 
-@app.get("/index_local_files")
-async def index_local_files(api_key: APIKey = Depends(get_api_key)):
+@app.get("/index_geojson_osm_features")
+async def index_geojson_osm(api_key: APIKey = Depends(get_api_key)):
     # await local_file_connector.add_descriptions_to_features()
-    feature_docs = await local_file_connector._features_to_docs()
-    res_local = local_file_indexer._index(documents=feature_docs)
+    feature_docs = await geojson_osm_connector._features_to_docs()
+    logging.info(f"Converted {len(feature_docs)} Features or FeatureGroups to documents")
+    res_local = geojson_osm_indexer._index(documents=feature_docs)
     return res_local
 
 def generate_combined_feature_collection(doc_list: List[Document]):
@@ -205,20 +212,25 @@ def generate_combined_feature_collection(doc_list: List[Document]):
 
 @app.get("/retrieve_geojson")
 async def retrieve_geojson(query: str):
-    features = local_file_indexer.retriever.invoke(query)
+    features = geojson_osm_indexer.retriever.invoke(query)
 
     return generate_combined_feature_collection(features)
 
 
 @app.get("/clear_index")
 async def clear_index(index_name: str, api_key: APIKey = Depends(get_api_key)):
-    if index_name not in (indexes, 'geojson'):
+    if index_name not in indexes and index_name != 'geojson':
         raise HTTPException(status_code=400, detail="Invalid index name")
-    elif index_name == 'geojson':
-       local_file_indexer._clear()
-    else: 
+    
+    if index_name == 'geojson':
+        logging.info("Clearing geojson index")
+        geojson_osm_indexer._clear()
+    else:
+        logging.info(f"Clearing index: {index_name}")
         indexes[index_name]._clear()
+    
     return {'message': 'Index cleared'}
+
 
 @app.get("/retrieve_with_id")
 async def retrieve_with_id(index_name: str, _id: str):
