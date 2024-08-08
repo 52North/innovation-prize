@@ -4,6 +4,7 @@ import logging
 from typing import List, Dict
 from langchain.schema import Document
 from config.config import Config
+import re 
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
@@ -15,7 +16,7 @@ class PyGeoAPI:
         if urls:
             self.urls = urls
         else:
-            self.urls = config.pygeoapi_instances
+            self.instances = config.pygeoapi_instances
 
     async def _get_queryables(self, session: aiohttp.ClientSession, collection_id: str, base_url: str) -> dict:
         """
@@ -32,16 +33,26 @@ class PyGeoAPI:
                 return queryables['properties']
             return {}
 
-    async def _get_collections(self, base_url: str) -> List[dict]:
+    async def _get_collections(self, instance) -> List[dict]:
         """
         Get all collections of a pygeoapi instance asynchronously.
         """
+        base_url = instance["url"]
         logging.info(f"Fetching collections of pygeoapi instance: {base_url}")
+
+        exclude_urls = instance["exclude_collections"]
+        pattern = r'collections/([^?]+)'
+        exclude_collections = list(map(lambda url:  re.search(pattern, url).group(1), exclude_urls))
+
+        logging.info(f"Excluding following collections from indexing operation: {exclude_collections}")
+
 
         async with aiohttp.ClientSession() as session:
             async with session.get(f'{base_url}/collections/') as response:
                 if response.status == 200:
                     collections = await response.json()
+                    # exluding collections
+                    collections['collections'] = [coll for coll in collections['collections'] if coll['id'] not in exclude_collections]
                     logging.debug(collections)
 
                     tasks = [
@@ -76,12 +87,12 @@ class PyGeoAPI:
                                    "extent": str(doc["extent"])}) for doc in collections]
         return docs
 
-    async def get_collections_and_generate_docs(self, url) -> Document:
-        collections = await self._get_collections(url)
-        docs = self._generate_docs(url, collections)
+    async def get_collections_and_generate_docs(self, instance) -> Document:
+        collections = await self._get_collections(instance)
+        docs = self._generate_docs(instance["url"], collections)
         return docs
 
     async def get_docs_for_all_instances(self) -> List[Document]:
-        tasks = [self.get_collections_and_generate_docs(url) for url in self.urls]
+        tasks = [self.get_collections_and_generate_docs(instance) for instance in self.instances]
         all_docs = await asyncio.gather(*tasks)
         return all_docs[0]

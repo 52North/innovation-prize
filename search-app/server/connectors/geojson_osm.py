@@ -70,7 +70,7 @@ class GeoJSON():
             self.features =  self._filter_meaningful_features(gj, tag_name)
         else:
             if not file_dir:
-                file_dir = config.local_files
+                file_dir = config.local_geojson_files
             logging.info(f"Looking for files in following dir: {file_dir[0]}")
             gj_files = []
             for file in glob.glob(f"{file_dir[0]}*.geojson"):
