@@ -5,6 +5,7 @@ import asyncio
 from fastapi.responses import RedirectResponse
 from langserve import add_routes
 from graph.graph import SpatialRetrieverGraph, State
+from graph.routers import CollectionRouter
 from langchain_core.runnables import chain
 from config.config import Config
 from indexing.indexer import Indexer
@@ -83,6 +84,10 @@ geojson_osm_indexer = Indexer(index_name="geojson",
 # Replace the value for tag_name argument if you have other data 
 geojson_osm_connector = GeoJSON(tag_name="building")
 
+# Adding conversational routes. We do this here to avoid time-expensive llm calls during inference:
+collection_router = CollectionRouter()
+conversational_prompts = collection_router.generate_converation_prompts()
+
 """
 local_file_connector = GeoJSON(file_dir="https://webais.demo.52north.org/pygeoapi/collections/dresden_buildings/items",
                                tag_name="building")
@@ -127,8 +132,14 @@ async def create_session(response: Response):
 
     global graph
 
-    graph = SpatialRetrieverGraph(state=State(messages=[], search_criteria="", search_results=[], ready_to_retrieve=""), 
-                                  thread_id=session_id, memory=memory).compile()
+    graph = SpatialRetrieverGraph(state=State(messages=[], 
+                                              search_criteria="", 
+                                              search_results=[], 
+                                              ready_to_retrieve=""), 
+                                              thread_id=session_id, 
+                                              memory=memory,
+                                              conversational_prompts=conversational_prompts,
+                                              route_layer=collection_router.rl).compile()
 
     data = SessionData(session_id=session_id)
 

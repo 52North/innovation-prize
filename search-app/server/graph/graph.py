@@ -7,10 +7,17 @@ from langchain_community.tools.tavily_search import TavilySearchResults
 from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
 import json
 from datetime import datetime
+from .routers import CollectionRouter
 from .actions import (
     run_converstation_chain,
     final_answer_chain,
+    search_tool
     )
+import logging
+import requests
+
+logging.basicConfig()
+logging.getLogger().setLevel(logging.INFO)
 
 
 class State(TypedDict):
@@ -18,14 +25,22 @@ class State(TypedDict):
     search_criteria: str
     search_results: List
     ready_to_retrieve: str
+    index_name: str
 
 class SpatialRetrieverGraph(StateGraph):
-    def __init__(self, state: State, thread_id: int, memory):
+    def __init__(self, 
+                 state: State, 
+                 thread_id: int, 
+                 memory, 
+                 conversational_prompts: dict=None,
+                 route_layer=None):
         super().__init__(state)
         self.setup_graph()
         self.counter = 0
         self.thread_id = thread_id
         self.memory = memory
+        self.conversational_prompts = conversational_prompts
+        self.route_layer = route_layer
 
     def setup_graph(self):
         self.add_node("conversation", self.run_conversation)
@@ -56,9 +71,25 @@ class SpatialRetrieverGraph(StateGraph):
         else:
             print("---start conversation (no previous messages)")
             chat_history = []
+        
+        # check if already search_criteria in state. if yes, use semantic router to choose prompt and correct search index
+        search_criteria = state.get("search_criteria", "")
+        if search_criteria:
+            route_choice = self.route_layer(search_criteria)
+        else:
+            route_choice = self.route_layer(state["messages"][-1].content)
 
-        response, parsed_dict = run_converstation_chain(input=state["messages"][-1].content, 
-                                          chat_history=chat_history)
+        prompt = None
+        if route_choice.name:
+            logging.info(f"Chosen route: {route_choice.name}")
+            state["index_name"] = route_choice.name
+            prompt = self.conversational_prompts[route_choice.name]
+        else:
+            logging.info("No route chosen, routing to default")
+        
+        response, parsed_dict = run_converstation_chain(input=state["messages"][-1].content,
+                                                        chat_history=chat_history,
+                                                        prompt=prompt)
         answer = json.loads(response.content).get("answer", "")
 
         state["messages"].append(AIMessage(content=answer))
@@ -68,9 +99,27 @@ class SpatialRetrieverGraph(StateGraph):
 
     def run_tavily_search(self, state: State):
         print("---running a tavily search")
-        tavily_search = TavilySearchResults()
-        search_results = tavily_search.invoke(state["search_criteria"])
+        # tavily_search = TavilySearchResults()       
+        # search_results = tavily_search.invoke(state["search_criteria"])
+        logging.info(f"Search criteria used: {state['search_criteria']}")
+        index_name = state.get("index_name", "")
+
+        #Todo: To enable custom index-based search, wee need to take care that we also use the correct embedding model for encoding queries... 
+        """
+        if index_name:
+            logging.info(f"Starting search in index: {index_name}")
+            search_results = search_tool.invoke({"query_string": state['search_criteria'],
+                                                 "index_name": index_name})
+        else: 
+            tavily_search = TavilySearchResults()  
+            search_results = tavily_search.invoke(state["search_criteria"])
+
+        """
+        tavily_search = TavilySearchResults()  
+        search_results = tavily_search.invoke(str(state["search_criteria"]))
+
         state["search_results"] = search_results
+
         state["messages"].append(AIMessage(content=f"Search results: {search_results}"))
         return state
 
