@@ -65,7 +65,9 @@ with open("./graph/current_workflow.png", "wb") as f:
 
 # Create a dictionary of indexes
 indexes = {
-    "pygeoapi": Indexer(index_name="pygeoapi"),
+    "pygeoapi": Indexer(index_name="pygeoapi",
+                        score_treshold= 0.4,
+                        k = 20),
 }
 
 # Add indexer for local geojson with OSM features
