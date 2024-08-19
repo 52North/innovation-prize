@@ -10,16 +10,19 @@ def generate_conversation_prompt(system_prompt=None):
     if not system_prompt:
         logging.info("Using default system prompt")
         system_prompt =  """
-        **AI Instructions:**´
-        You are an AI designed to assist users in finding environmental or geospatial datasets. Follow these guidelines:
+        **AI Instructions:**
+            You are an AI designed to assist users in finding environmental or geospatial datasets. Follow these guidelines: 
+            1. **Extract Search Criteria:**
+            2. **Refine the Search:** If the request is vague, ask follow-up questions about <fill in based on collection>. Only re-ask a maximum of 3 times per inquiry and try to ask as few questions as possible. Use bold formatting (markdown) to highlight important aspects in your response. 
+            3. **Contextual Responses:** Keep track of the conversation context to use previous responses in refining the search. 
+            4. **Determine Readiness for Search:**
+                - **Flag as Ready:** As soon as you have enough details to perform a meaningful search or if the user implies they want to proceed with the search, set the flag `"ready_to_retrieve": "yes"`.
+                - **Avoid Over-Questioning:** If you sense the user is ready to search based on their input (e.g., "Sure, search for...", "That should be enough...", "Go ahead and find the data..."), immediately set the flag `"ready_to_retrieve": "yes"` and stop asking further questions.
+            5. **Generate Search Query:** Once enough details are gathered, create a search string that combines all specified criteria.
 
-        1. **Extract Search Criteria:** Identify the specific type of environmental or geospatial data the user is requesting.
-        2. **Refine the Search:** If the request is vague, ask follow-up questions about the time period, geographic area, resolution, or format to gather more details. Only re-ask maximum of 3 times per inquery and try to ask as less as possible. Use bold formatting (markdown) to highlight important aspects in your response.
-        3. **Contextual Responses:** Keep track of the conversation context to use previous responses in refining the search.
-        4. **Generate Search Query:** Once enough details are gathered, create a search string that combines all specified criteria.
-
-        'You must always output a JSON object with an "answer" key and a "search_criteria" key.' 
-        If you have the impression that the user gives the go to search, do not ask follow-up questions and add a flag "ready_to_retrieve": "yes".
+        **Output Requirements:**
+            - Always output a JSON object with an `"answer"` key (containing your response) and a `"search_criteria"` key (containing the extracted criteria).
+            - If the search is ready to proceed, include `"ready_to_retrieve": "yes"` in the JSON object.
 
         **Tips for Natural Interaction:**
         - Maintain a friendly and conversational tone.
@@ -68,6 +71,8 @@ def generate_conversation_prompt(system_prompt=None):
         """
     else:
         logging.info("Using custom system prompt")
+        
+
     prompt = ChatPromptTemplate.from_messages(
         [
             (
@@ -78,6 +83,10 @@ def generate_conversation_prompt(system_prompt=None):
             ("human", "{input}"),
         ],
     )
+    
+    # Explicitely setting the input variables here because sometimes it was hallucinating other input variables.
+    prompt.input_variables = ['chat_history', 'input']
+    prompt.messages[0].prompt.input_variables=[]
 
     return prompt
 
@@ -85,7 +94,8 @@ def generate_conversation_prompt(system_prompt=None):
 def generate_final_answer_prompt():
     final_answer_prompt = PromptTemplate(
         template="""
-        You are an assistant for question-answering tasks. 
+        You are an assistant for question-answering tasks related to data search.
+        The question wil be a query and the context either the found datasets or a summary of the recieved data. 
         Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know. 
         Use three sentences maximum and keep the answer concise
         Question: {query} 

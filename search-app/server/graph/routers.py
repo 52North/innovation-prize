@@ -1,0 +1,142 @@
+import os
+from langchain_openai import ChatOpenAI
+from langchain_core.output_parsers import StrOutputParser
+from langchain.prompts import PromptTemplate
+from config.config import Config
+import chromadb
+from chromadb.config import Settings
+import re
+from semantic_router import Route
+from semantic_router.layer import RouteLayer
+from semantic_router.encoders import OpenAIEncoder
+import logging
+
+logging.basicConfig()
+logging.getLogger().setLevel(logging.INFO)
+
+
+
+config = Config('./config/config.json')
+
+OPENAI_API_KEY = config.openai_api_key
+
+class CollectionRouter():
+    def __init__(self, persist_dir: str="../server/chroma_db"):
+        self.llm = ChatOpenAI(model="gpt-3.5-turbo-0125")
+        self.encoder = OpenAIEncoder()
+
+        self.coll_dicts = self.get_collection_info(persist_dir=persist_dir)
+        self.routes = [self.generate_route(collection_dict=coll) for coll in self.coll_dicts]
+
+        self.rl = RouteLayer(encoder=self.encoder, routes=self.routes)
+
+    def get_collection_info(self, persist_dir: str) -> dict:
+        """
+        Fetching information about existing collections
+        """
+        client = chromadb.Client(Settings(is_persistent=True,
+                                        persist_directory=persist_dir,
+                                        ))
+
+        collections = client.list_collections()
+
+        coll_dicts = []
+        for c in collections:
+            print(f"Looking into collection {c.name}")
+            if c.name != "langchain":
+                coll = client.get_collection(c.name)
+                sample_docs = coll.peek()["documents"]
+                coll_dicts.append({
+                    "collection_name": c.name,
+                    "embedding_model": c._embedding_function.MODEL_NAME,
+                    "sample_docs": sample_docs
+                })
+        return coll_dicts
+    
+    def generate_route(self, collection_dict: dict):
+        prompt_collection_desc = PromptTemplate(
+            template="""You receive a collection from a vector database. 
+            Based on the collection's name and a few sample documents, you get an idea of the collection's contents, including its theme, type of data, and any notable characteristics. 
+            Now, create a numbered list of example queries that users might submit to the 
+            vector store to retrieve relevant information from this collection (ignore location references and proper names that can occur in the samples and generate generic queries)."
+            Additionally, generate a brief description (60 words maximum) of the collection's contents, including its theme, type of data, and any notable characteristics
+            
+            Collection:{collection}""",
+            input_variables= ["collection"],
+        )
+
+        coll_chain = (
+            prompt_collection_desc
+            | self.llm
+            | StrOutputParser()
+        )
+
+        
+        result = coll_chain.invoke({"collection": collection_dict})
+
+        # Split the input text into the list and description
+        parts = result.split('\n\nDescription:')
+
+        # Handle the numbered list
+        list_text = parts[0]
+        utterances = re.sub(r'\d+\.\s', '', list_text).split('\n')
+
+        # Handle the description
+        description = parts[1] if len(parts) > 1 else ""
+        
+        # Write the collection description into the coll_dict
+        for c in self.coll_dicts:
+            if c["collection_name"] == collection_dict["collection_name"]:
+                c["description"] = description
+
+        route  = Route(
+            name=collection_dict['collection_name'],
+            description=description,
+            score_threshold=0.7,
+            utterances=[u for u in utterances if u],
+        )
+        return route
+        
+    def generate_conversation_prompts(self):
+        prompt = PromptTemplate(
+            template="""
+            You recieve a collection from a vector database. According to the collection name and sample docs, write a prompt that can be used for an agent that shall assist users in finding data.
+            Ignore possible spatial references (like place names) in the sample docs and generate a generic prompt.
+            Use the following structure:
+            ```
+            **AI Instructions:**
+            You are an AI designed to assist users in finding environmental or geospatial datasets. Follow these guidelines: 
+            1. **Extract Search Criteria:**
+            2. **Refine the Search:** If the request is vague, ask follow-up questions about <fill in based on collection (dont be too specific here)>. Only re-ask a maximum of 3 times per inquiry and try to ask as few questions as possible. Use bold formatting (markdown) to highlight important aspects in your response. 
+            3. **Contextual Responses:** Keep track of the conversation context to use previous responses in refining the search. 
+            4. **Determine Readiness for Search:**
+                - **Flag as Ready:** As soon as you have enough details to perform a meaningful search or if the user implies they want to proceed with the search, set the flag `"ready_to_retrieve": "yes"`.
+                - **Avoid Over-Questioning:** If you sense the user is ready to search based on their input (e.g., "Sure, search for...", "That should be enough...", "Go ahead and find the data..."), immediately set the flag `"ready_to_retrieve": "yes"` and stop asking further questions.
+            5. **Generate Search Query:** Once enough details are gathered, create a search string that combines all specified criteria.
+
+            **Output Requirements:**
+                - Always output a JSON object with an `"answer"` key (containing your response) and a `"search_criteria"` key (containing the extracted criteria).
+                - If the search is ready to proceed, include `"ready_to_retrieve": "yes"` in the JSON object.
+
+            **Tips for Natural Interaction:**
+            - Maintain a friendly and conversational tone.
+            - Acknowledge user inputs and express appreciation for their responses.
+            - Keep responses clear and straightforward while ensuring they meet the user's needs.
+
+
+            **Example Conversations:** <Provide **at three** example conversations from initial request until the search can be conducted. Only show complete conversations>
+            ```
+
+            Here is the list: {collection}""",
+            
+            input_variables=["collection"],
+        )
+        chain = (
+            prompt
+            | self.llm
+            | StrOutputParser()
+        )
+        
+        logging.info("Generating individual prompts for all collections")
+        prompts = {c['collection_name']: chain.invoke({"collection": c}) for c in self.coll_dicts}
+        return prompts

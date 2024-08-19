@@ -7,22 +7,28 @@ from langchain_community.tools.tavily_search import TavilySearchResults
 from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
 import json
 from datetime import datetime
-from .routers import CollectionRouter
 from .actions import (
     run_converstation_chain,
     final_answer_chain,
-    search_tool
+    generate_search_tool,
+    spatial_context_extraction_tool
     )
 import logging
-import requests
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
+def is_valid_json(myjson):
+    try:
+        json_object = json.loads(myjson)
+    except ValueError as e:
+        return False
+    return True
 
 class State(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
     search_criteria: str
+    spatial_context: str
     search_results: List
     ready_to_retrieve: str
     index_name: str
@@ -32,19 +38,28 @@ class SpatialRetrieverGraph(StateGraph):
                  state: State, 
                  thread_id: int, 
                  memory, 
-                 conversational_prompts: dict=None,
-                 route_layer=None):
+                 search_indexes: dict,
+                 collection_router,
+                 conversational_prompts: dict=None
+                 ):
         super().__init__(state)
         self.setup_graph()
         self.counter = 0
         self.thread_id = thread_id
         self.memory = memory
+        self.search_indexes = search_indexes
         self.conversational_prompts = conversational_prompts
-        self.route_layer = route_layer
-
+        self.route_layer = collection_router.rl
+        self.search_indexes = search_indexes
+        self.collection_info_dict = collection_router.coll_dicts
+        
+        # This takes generates an individual search tool for all collections available 
+        self.search_tools = {c['collection_name']: generate_search_tool(c) for c in self.collection_info_dict}
+     
     def setup_graph(self):
         self.add_node("conversation", self.run_conversation)
-        self.add_node("tavily_search", self.run_tavily_search)
+        self.add_node("extract_spatial_context", self.extract_spatial_context)
+        self.add_node("search", self.run_search)
         self.add_node("final_answer", self.final_answer)
         self.add_node("save_state", self.save_state)
 
@@ -53,10 +68,12 @@ class SpatialRetrieverGraph(StateGraph):
             self.should_continue,
             {
                 "human": "save_state",
-                "tavily_search": "tavily_search"
+                "extract_spatial_context": "extract_spatial_context"
             }
         )
-        self.add_edge("tavily_search", "final_answer")
+        
+        self.add_edge("extract_spatial_context", "search")
+        self.add_edge("search", "final_answer")
         self.add_edge("final_answer", "save_state")
         self.add_edge("save_state", END)
 
@@ -87,36 +104,47 @@ class SpatialRetrieverGraph(StateGraph):
         else:
             logging.info("No route chosen, routing to default")
         
+        logging.info(f"Custom prompt:{prompt}")
         response, parsed_dict = run_converstation_chain(input=state["messages"][-1].content,
                                                         chat_history=chat_history,
                                                         prompt=prompt)
-        answer = json.loads(response.content).get("answer", "")
+        
+        if response.content and is_valid_json(response.content):
+            answer = json.loads(response.content).get("answer", "")
+        else:
+            answer = "Sorry, I am only designed to help you with finding data. Please try again typing your request :)"
 
         state["messages"].append(AIMessage(content=answer))
         state["search_criteria"] = parsed_dict.get("search_criteria", "")
         state["ready_to_retrieve"] = parsed_dict.get("ready_to_retrieve", "no")
         return state
 
-    def run_tavily_search(self, state: State):
-        print("---running a tavily search")
-        # tavily_search = TavilySearchResults()       
-        # search_results = tavily_search.invoke(state["search_criteria"])
+    def extract_spatial_context(self, state: State):
+        print("---extracting spatial context of search")
+        spatial_context = spatial_context_extraction_tool.invoke({"query": str(state['search_criteria'])})
+        state['spatial_context'] = spatial_context
+
+        logging.info(f"Extracted following spatial context: {spatial_context}")
+        return state
+    
+    def run_search(self, state: State):
+        print("---running a search")
         logging.info(f"Search criteria used: {state['search_criteria']}")
         index_name = state.get("index_name", "")
 
-        #Todo: To enable custom index-based search, wee need to take care that we also use the correct embedding model for encoding queries... 
-        """
+        search_index = self.search_indexes[index_name]
+        search_tool = self.search_tools[index_name]
+
         if index_name:
-            logging.info(f"Starting search in index: {index_name}")
-            search_results = search_tool.invoke({"query_string": state['search_criteria'],
-                                                 "index_name": index_name})
+            logging.info(f"Starting search in index: {index_name} using this tool: {search_tool.name}")
+            
+            search_results = search_tool.invoke({"query": str(state['search_criteria']),
+                                                 "search_index": search_index,
+                                                 "search_type": "similarity",
+                                                 "k": 3})
         else: 
             tavily_search = TavilySearchResults()  
             search_results = tavily_search.invoke(state["search_criteria"])
-
-        """
-        tavily_search = TavilySearchResults()  
-        search_results = tavily_search.invoke(str(state["search_criteria"]))
 
         state["search_results"] = search_results
 
@@ -125,13 +153,18 @@ class SpatialRetrieverGraph(StateGraph):
 
     def should_continue(self, state: State) -> str:
         if state.get("ready_to_retrieve") == "yes":
-            print("---routing to search")
-            return "tavily_search"
+            print("---routing to spatial context extractor, then to search")
+            return "extract_spatial_context"
         else:
             return "human"
 
     def final_answer(self, state: State) -> str:
-        query, context = state["search_criteria"], state["search_results"]
+        if state["index_name"] == "geojson":
+            logging.info(f"I found: {state['search_results'][-1]}")
+            context = state["search_results"][-1]
+        else:
+            context = state["search_results"]
+        query = state["search_criteria"]
         answer = final_answer_chain.invoke({"query": query,
                                             "context": context}).strip()
         
