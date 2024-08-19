@@ -1,31 +1,30 @@
 from fastapi import FastAPI, HTTPException
-import asyncio
-from fastapi import FastAPI, HTTPException
-import asyncio
 from fastapi.responses import RedirectResponse
 from langserve import add_routes
 from graph.graph import SpatialRetrieverGraph, State
-from langchain_core.runnables import chain
+from graph.routers import CollectionRouter
 from config.config import Config
 from indexing.indexer import Indexer
 from connectors.pygeoapi_retriever import PyGeoAPI
 from connectors.geojson_osm import GeoJSON
-from langchain_core.runnables.graph import MermaidDrawMethod
 from langchain.schema import Document
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage
 from fastapi.middleware.cors import CORSMiddleware
-from .utils import SessionData, cookie, verifier, backend
+from .utils import (SessionData, cookie, verifier, backend, 
+                    calculate_bounding_box, summarize_feature_collection_properties, 
+                    load_conversational_prompts)
+
 from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
 from fastapi import HTTPException, FastAPI, Depends, Response, Security
 from fastapi.security.api_key import APIKeyHeader, APIKey
 from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
 from uuid import UUID, uuid4
-from typing import List, Optional
+from typing import List
 import geojson
 from pydantic import BaseModel
 import json
-
 import logging
+
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
@@ -36,7 +35,9 @@ origins = [
     "http://localhost:5173",  # Frontend app origin
 ]
 
+# Init memory:
 memory = AsyncSqliteSaver.from_conn_string(":memory:")
+
 ### Get session info via cookie
 async def get_current_session(session_id: UUID = Depends(cookie), session_data: SessionData = Depends(verifier)):
     return session_data
@@ -54,39 +55,37 @@ api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 # graph = SpatialRetrieverGraph(State(messages=[], search_criteria="", search_results=[], ready_to_retrieve="")).compile()
 graph = None
 session_id = None
-"""
-# Generate a visualization of the current dialog-module workflow
-graph_visualization = graph.get_graph().draw_mermaid_png(
-    draw_method=MermaidDrawMethod.API,
-)
-with open("./graph/current_workflow.png", "wb") as f:
-    f.write(graph_visualization)
-"""
+
 
 # Create a dictionary of indexes
 indexes = {
     "pygeoapi": Indexer(index_name="pygeoapi",
                         score_treshold= 0.4,
                         k = 20),
-}
-
-# Add indexer for local geojson with OSM features
-geojson_osm_indexer = Indexer(index_name="geojson", 
+    "geojson_osm_indexer": Indexer(index_name="geojson", # Add indexer for local geojson with OSM features
                              score_treshold=-400.0, 
                              k = 20,
                              use_hf_model=True,
                              embedding_model="Alibaba-NLP/gte-large-en-v1.5"
                             )
-
+}
 
 # Add connection to local file including building features 
 # Replace the value for tag_name argument if you have other data 
 geojson_osm_connector = GeoJSON(tag_name="building")
-
 """
+# We can also use a osm/geojson that comes from a web resource
 local_file_connector = GeoJSON(file_dir="https://webais.demo.52north.org/pygeoapi/collections/dresden_buildings/items",
                                tag_name="building")
 """
+
+# Adding conversational routes. We do this here to avoid time-expensive llm calls during inference:
+collection_router = CollectionRouter()
+
+# Check if already custom prompts generated and if yes: check if these match the existing search indexes 
+conversational_prompts = load_conversational_prompts(collection_router=collection_router)
+
+
 
 app = FastAPI()
 
@@ -127,8 +126,17 @@ async def create_session(response: Response):
 
     global graph
 
-    graph = SpatialRetrieverGraph(state=State(messages=[], search_criteria="", search_results=[], ready_to_retrieve=""), 
-                                  thread_id=session_id, memory=memory).compile()
+    graph = SpatialRetrieverGraph(state=State(messages=[], 
+                                              search_criteria="", 
+                                              spatial_context="",
+                                              search_results=[], 
+                                              ready_to_retrieve=""), 
+                                              thread_id=session_id, 
+                                              memory=memory,
+                                              search_indexes=indexes,
+                                              collection_router=collection_router,
+                                              conversational_prompts=conversational_prompts
+                                              ).compile()
 
     data = SessionData(session_id=session_id)
 
@@ -136,23 +144,6 @@ async def create_session(response: Response):
     cookie.attach_to_response(response, session)
 
     return {"message": f"created session for {session}"}
-
-"""
-@chain
-async def call_graph(query: str, session_id: UUID = Depends(cookie), session_data: SessionData = Depends(verifier)):
-    if graph is not None:
-        print(f"-#-#--Running graph---- Using session_id: {str(session_id)}")
-        print(f"session_data: {session_data}")
-        inputs = {"messages": [HumanMessage(content=query)]}
-        graph.graph.thread_id = "test"
-        response = await graph.ainvoke(inputs)
-    else:
-        raise HTTPException(status_code=400, detail="No session created")
-    return response
-"""
-@app.get("/test_api_key")
-async def test_api_key(api_key: APIKey = Depends(get_api_key)):
-    return f"Entered API KEY: {api_key}"
 
 class Query(BaseModel):
     query: str
@@ -192,7 +183,7 @@ async def index_geojson_osm(api_key: APIKey = Depends(get_api_key)):
     # await local_file_connector.add_descriptions_to_features()
     feature_docs = await geojson_osm_connector._features_to_docs()
     logging.info(f"Converted {len(feature_docs)} Features or FeatureGroups to documents")
-    res_local = geojson_osm_indexer._index(documents=feature_docs)
+    res_local = indexes['geojson_osm_indexer']._index(documents=feature_docs)
     return res_local
 
 def generate_combined_feature_collection(doc_list: List[Document]):
@@ -208,15 +199,26 @@ def generate_combined_feature_collection(doc_list: List[Document]):
             features.extend(feature_list)
 
     combined_feature_collection  = geojson.FeatureCollection(features)
-    geojson_str = geojson.dumps(combined_feature_collection, sort_keys=True, indent=2)
+    # geojson_str = geojson.dumps(combined_feature_collection, sort_keys=True, indent=2)
 
-    return geojson_str
+    return combined_feature_collection
 
 @app.get("/retrieve_geojson")
 async def retrieve_geojson(query: str):
-    features = geojson_osm_indexer.retriever.invoke(query)
+    features = indexes['geojson_osm_indexer'].retriever.invoke(query)
 
-    return generate_combined_feature_collection(features)
+    feature_collection = generate_combined_feature_collection(features)
+
+    spatial_extent = calculate_bounding_box(feature_collection)
+    properties = summarize_feature_collection_properties(feature_collection)
+
+    summary = f"""Summary of found features:
+        {properties}
+    	
+    Spatial Extent of all features: {spatial_extent}
+    """
+
+    return feature_collection, summary
 
 
 @app.get("/clear_index")
@@ -226,7 +228,7 @@ async def clear_index(index_name: str, api_key: APIKey = Depends(get_api_key)):
     
     if index_name == 'geojson':
         logging.info("Clearing geojson index")
-        geojson_osm_indexer._clear()
+        indexes['geojson_osm_indexer']._clear()
     else:
         logging.info(f"Clearing index: {index_name}")
         indexes[index_name]._clear()
@@ -256,4 +258,4 @@ for index_name, index_instance in indexes.items():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", reload=False, port=8000)

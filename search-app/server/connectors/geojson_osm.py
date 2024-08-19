@@ -59,15 +59,19 @@ class GeoJSON():
         _features_to_docs() -> List[Document]: 
             Converts features into a list of Document objects for further use.
     """
-    def __init__(self, file_dir: str = None, tag_name: str = "building"):        
+    def __init__(self, file_dir: str = None, tag_name: str = None):        
         if file_dir and is_url(file_dir):
             """We assume the online resource to be a collection published via a PyGeoAPI instance"""
             logging.info("Getting features from online resource")
             params = {"f": "json", "limit": 10000}
             gj = self._fetch_features_from_online_resource(file_dir, params)
             print(f"Retrieved {len(gj)} features")
-
-            self.features =  self._filter_meaningful_features(gj, tag_name)
+            
+            self.tag_name = tag_name
+            if self.tag_name:
+                self.features =  self._filter_meaningful_features(gj, self.tag_name)
+            else:
+                self.features = gj
         else:
             if not file_dir:
                 file_dir = config.local_geojson_files
@@ -180,7 +184,8 @@ class GeoJSON():
         return "\n".join(description_parts)
 
     async def _features_to_docs(self) -> List[Document]:
-        await self.add_descriptions_to_features()
+        if self.tag_name:
+            await self.add_descriptions_to_features()
 
         # Part 1: Create documents for features with names
         features_with_names = list(filter(lambda feature: feature if feature["properties"].get("name", "") else None, self.features))
