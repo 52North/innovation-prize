@@ -24,6 +24,8 @@ import geojson
 from pydantic import BaseModel
 import json
 import logging
+from typing import Optional, Dict, Any
+
 
 
 logging.basicConfig()
@@ -62,7 +64,7 @@ indexes = {
     "pygeoapi": Indexer(index_name="pygeoapi",
                         score_treshold= 0.4,
                         k = 20),
-    "geojson_osm_indexer": Indexer(index_name="geojson", # Add indexer for local geojson with OSM features
+    "geojson": Indexer(index_name="geojson", # Add indexer for local geojson with OSM features
                              score_treshold=-400.0, 
                              k = 20,
                              use_hf_model=True,
@@ -128,7 +130,7 @@ async def create_session(response: Response):
 
     graph = SpatialRetrieverGraph(state=State(messages=[], 
                                               search_criteria="", 
-                                              spatial_context="",
+                                              spatio_temporal_context={},
                                               search_results=[], 
                                               ready_to_retrieve=""), 
                                               thread_id=session_id, 
@@ -147,12 +149,17 @@ async def create_session(response: Response):
 
 class Query(BaseModel):
     query: str
+    spatio_temporal_context: Optional[Dict[str, Any]] = None
     
 @app.post("/data")
 async def call_graph(query_data: Query, session_id: UUID = Depends(cookie)):
     if graph is not None:
         print(f"-#-#--Running graph---- Using session_id: {str(session_id)}")
         inputs = {"messages": [HumanMessage(content=query_data.query)]}
+
+        if query_data.spatio_temporal_context:
+            inputs['spatio_temporal_context'] = query_data.spatio_temporal_context
+
         graph.graph.thread_id = str(session_id)
         response = await graph.ainvoke(inputs)
     else:
@@ -183,7 +190,7 @@ async def index_geojson_osm(api_key: APIKey = Depends(get_api_key)):
     # await local_file_connector.add_descriptions_to_features()
     feature_docs = await geojson_osm_connector._features_to_docs()
     logging.info(f"Converted {len(feature_docs)} Features or FeatureGroups to documents")
-    res_local = indexes['geojson_osm_indexer']._index(documents=feature_docs)
+    res_local = indexes['geojson']._index(documents=feature_docs)
     return res_local
 
 def generate_combined_feature_collection(doc_list: List[Document]):
@@ -205,7 +212,7 @@ def generate_combined_feature_collection(doc_list: List[Document]):
 
 @app.get("/retrieve_geojson")
 async def retrieve_geojson(query: str):
-    features = indexes['geojson_osm_indexer'].retriever.invoke(query)
+    features = indexes['geojson'].retriever.invoke(query)
 
     feature_collection = generate_combined_feature_collection(features)
 
@@ -228,7 +235,7 @@ async def clear_index(index_name: str, api_key: APIKey = Depends(get_api_key)):
     
     if index_name == 'geojson':
         logging.info("Clearing geojson index")
-        indexes['geojson_osm_indexer']._clear()
+        indexes['geojson']._clear()
     else:
         logging.info(f"Clearing index: {index_name}")
         indexes[index_name]._clear()

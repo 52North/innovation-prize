@@ -94,12 +94,11 @@ def generate_conversation_prompt(system_prompt=None):
 def generate_final_answer_prompt():
     final_answer_prompt = PromptTemplate(
         template="""
-        You are an assistant for question-answering tasks related to data search.
-        The question wil be a query and the context either the found datasets or a summary of the recieved data. 
-        Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know. 
+        You describe the results of a data search given a certain query.
+        The search results are either the found datasets or a summary of the recieved data. 
         Use three sentences maximum and keep the answer concise
         Question: {query} 
-        Context: {context} 
+        Found data: {context} 
         Answer:""",
         input_variables=["query", "context"],
     )

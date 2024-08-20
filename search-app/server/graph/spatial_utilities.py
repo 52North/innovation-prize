@@ -86,5 +86,30 @@ def generate_spatial_context_chain(llm):
     return spatial_context_chain
 
 
-# response = spatial_context_chain.invoke({"query": "I climate data for Berlin"})
-# print(response)
+### Functions to check if results with geojson are within a certain spatial extent
+# Use this to check if search results match query bbox.
+import json
+def is_within_bbox(lon, lat, bbox):
+    min_lon, max_lat, max_lon, min_lat = bbox
+    return min_lon <= lon <= max_lon and min_lat <= lat <= max_lat
+
+def check_within_bbox(search_results, bbox):
+    if not bbox:
+        return search_results
+    
+    results_within_bbox = []
+
+    for result in search_results:
+        feature_str = result.metadata.get('feature', '{}')
+        feature = json.loads(feature_str)
+        coordinates = feature.get('coordinates', [])
+        
+        # Flatten the coordinates (if needed) and check if any coordinate is within the bbox
+        for poly in coordinates:
+            for coord in poly:  # Assuming polygon with one ring
+                lon, lat = coord
+                if is_within_bbox(lon, lat, bbox):
+                    results_within_bbox.append(result)
+                    break  # No need to check other coordinates of this polygon if already within bbox
+    
+    return results_within_bbox

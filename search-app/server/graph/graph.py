@@ -13,7 +13,9 @@ from .actions import (
     generate_search_tool,
     spatial_context_extraction_tool
     )
+from .spatial_utilities import check_within_bbox
 import logging
+import ast
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
@@ -28,7 +30,7 @@ def is_valid_json(myjson):
 class State(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
     search_criteria: str
-    spatial_context: str
+    spatio_temporal_context: dict
     search_results: List
     ready_to_retrieve: str
     index_name: str
@@ -58,7 +60,7 @@ class SpatialRetrieverGraph(StateGraph):
      
     def setup_graph(self):
         self.add_node("conversation", self.run_conversation)
-        self.add_node("extract_spatial_context", self.extract_spatial_context)
+        self.add_node("extract_spatio_temporal_context", self.extract_spatio_temporal_context)
         self.add_node("search", self.run_search)
         self.add_node("final_answer", self.final_answer)
         self.add_node("save_state", self.save_state)
@@ -68,11 +70,11 @@ class SpatialRetrieverGraph(StateGraph):
             self.should_continue,
             {
                 "human": "save_state",
-                "extract_spatial_context": "extract_spatial_context"
+                "extract_spatio_temporal_context": "extract_spatio_temporal_context"
             }
         )
         
-        self.add_edge("extract_spatial_context", "search")
+        self.add_edge("extract_spatio_temporal_context", "search")
         self.add_edge("search", "final_answer")
         self.add_edge("final_answer", "save_state")
         self.add_edge("save_state", END)
@@ -119,12 +121,24 @@ class SpatialRetrieverGraph(StateGraph):
         state["ready_to_retrieve"] = parsed_dict.get("ready_to_retrieve", "no")
         return state
 
-    def extract_spatial_context(self, state: State):
+    def extract_spatio_temporal_context(self, state: State):
         print("---extracting spatial context of search")
-        spatial_context = spatial_context_extraction_tool.invoke({"query": str(state['search_criteria'])})
-        state['spatial_context'] = spatial_context
+        spatio_temporal_context = state.get('spatio_temporal_context', None)
 
-        logging.info(f"Extracted following spatial context: {spatial_context}")
+        if spatio_temporal_context:
+            spatial_extent = spatio_temporal_context.get('extent', [])
+            temporal_extent = spatio_temporal_context.get('temporal', "")
+
+        if not spatio_temporal_context:
+            spatial_context_str = spatial_context_extraction_tool.invoke({"query": str(state['search_criteria'])})
+            spatial_extent = ast.literal_eval(spatial_context_str).get("extent", [])
+
+            state['spatio_temporal_context'] = spatial_extent
+            
+            #Todo: also try to derive temporal extent from inputs
+            temporal_extent = ""
+
+        logging.info(f"Extracted following spatial context: {spatial_extent} and following temporal extent: {temporal_extent}")
         return state
     
     def run_search(self, state: State):
@@ -139,9 +153,9 @@ class SpatialRetrieverGraph(StateGraph):
             logging.info(f"Starting search in index: {index_name} using this tool: {search_tool.name}")
             
             search_results = search_tool.invoke({"query": str(state['search_criteria']),
-                                                 "search_index": search_index,
-                                                 "search_type": "similarity",
-                                                 "k": 3})
+                                                                        "search_index": search_index,
+                                                                        "search_type": "similarity",
+                                                                        "k": 10})
         else: 
             tavily_search = TavilySearchResults()  
             search_results = tavily_search.invoke(state["search_criteria"])
@@ -154,20 +168,45 @@ class SpatialRetrieverGraph(StateGraph):
     def should_continue(self, state: State) -> str:
         if state.get("ready_to_retrieve") == "yes":
             print("---routing to spatial context extractor, then to search")
-            return "extract_spatial_context"
+            return "extract_spatio_temporal_context"
         else:
             return "human"
 
     def final_answer(self, state: State) -> str:
-        if state["index_name"] == "geojson":
-            logging.info(f"I found: {state['search_results'][-1]}")
-            context = state["search_results"][-1]
-        else:
-            context = state["search_results"]
-        query = state["search_criteria"]
-        answer = final_answer_chain.invoke({"query": query,
-                                            "context": context}).strip()
+        for c in self.collection_info_dict:
+            if c['collection_name'] == state['index_name']:
+                search_index_info = c.pop('sample_docs', None)
         
+        #Todo: use the temporal constraint (e.g. as filter)
+        try:
+            if state["index_name"] == "geojson":        
+                # Check if results match spatial context of query
+                query_bbox = state['spatio_temporal_context']
+                search_results = check_within_bbox(search_results=state["search_results"],
+                                                bbox=query_bbox)
+                
+                logging.info(f"I found: {len(search_results)} using the query-bbox {query_bbox}")
+
+                doc_contents = "\n\n".join(doc.page_content for doc in search_results)
+    
+                context = f"""I searched in this search index: {search_index_info}.
+                The top-{len(search_results)} search results in the specified spatial extent are: {doc_contents}"""               
+
+            else:
+                search_results = state["search_results"][:10]
+                doc_contents = "\n\n".join(doc.page_content for doc in search_results)
+                context = f"""I searched in this search index: {search_index_info}.
+                The top-{len(search_results)} search results are: {doc_contents}"""
+            
+            if len(search_results) < 1:
+                context = "No search results found using the current search criteria" 
+                state['search_results'] = []
+            query = state["search_criteria"]
+            answer = final_answer_chain.invoke({"query": query,
+                                                "context": context}).strip()
+        except:
+            answer = "Sorry I was not able to process your input. Can you please try again?"
+
         state["messages"].append(AIMessage(content=answer))
         return state
     
