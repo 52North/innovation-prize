@@ -7,6 +7,14 @@
 
 ## Installation
 
+We recommend that you create a virtual Python environment in which all the necessary libraries are installed:
+```bash
+python -m venv <path-to-venv>
+
+# activate venv
+. <path-to-venv>/bin/activate
+```
+
 Install the LangChain CLI if you haven't yet
 
 ```bash
