@@ -7,18 +7,20 @@
 
 ## Installation
 
-We recommend that you create a virtual Python environment in which all the necessary libraries are installed:
-```bash
-python -m venv <path-to-venv>
-
-# activate venv
-. <path-to-venv>/bin/activate
-```
-
 Install the LangChain CLI if you haven't yet
 
 ```bash
 pip install -U langchain-cli
+```
+
+This project uses python poetry dependency manager to install dependencies. If you haven't yet installed: 
+```bash
+sudo apt install python3-poetry
+```
+
+Then you can install all dependencies using
+```bash
+poetry install
 ```
 ## Configuration
 :warning: This app must be configured in order to work properly.
