@@ -66,7 +66,6 @@ class GeoJSON():
             params = {"f": "json", "limit": 10000}
             gj = self._fetch_features_from_online_resource(file_dir, params)
             print(f"Retrieved {len(gj)} features")
-            
             self.tag_name = tag_name
             if self.tag_name:
                 self.features =  self._filter_meaningful_features(gj, self.tag_name)
@@ -102,6 +101,10 @@ class GeoJSON():
                 break
             all_features.extend(features)
             offset += params['limit']
+
+        # copy id from pygeoapi in properties
+        for f in all_features:
+            f['properties']['id'] = f['id']
 
         return all_features
     
@@ -198,7 +201,7 @@ class GeoJSON():
             metadata = {
                 "type": properties.get(self.tag_name, "Unknown"),
                 "feature": json.dumps(feature["geometry"] , indent=2),
-                "url": "url"
+                "url": str(properties.get("id", "url"))
             }
 
             for property, value in feature["properties"].items():

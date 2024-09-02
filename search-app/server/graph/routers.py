@@ -22,7 +22,7 @@ OPENAI_API_KEY = config.openai_api_key
 
 class CollectionRouter():
     def __init__(self, persist_dir: str="../server/chroma_db"):
-        self.llm = ChatOpenAI(model="gpt-3.5-turbo-0125")
+        self.llm = ChatOpenAI(model="gpt-4o-mini")
         self.encoder = OpenAIEncoder()
 
         self.coll_dicts = self.get_collection_info(persist_dir=persist_dir)
@@ -42,15 +42,19 @@ class CollectionRouter():
 
         coll_dicts = []
         for c in collections:
-            print(f"Looking into collection {c.name}")
-            if c.name != "langchain":
-                coll = client.get_collection(c.name)
-                sample_docs = coll.peek()["documents"]
-                coll_dicts.append({
-                    "collection_name": c.name,
-                    "embedding_model": c._embedding_function.MODEL_NAME,
-                    "sample_docs": sample_docs
-                })
+                logging.info(f"Looking into collection {c.name}")
+                if c.name != "langchain":
+                    coll = client.get_collection(c.name)
+                    number_docs = coll.count()
+                    top_10_docs = coll.peek()
+                    sample_docs = top_10_docs["documents"]
+                    unique_keys = {key for d in top_10_docs['metadatas'] for key in d.keys()}
+                    coll_dicts.append({
+                        "collection_name": c.name,
+                        "sample_docs": sample_docs,
+                        "metadata_keys": unique_keys if unique_keys else [],
+                        "number_docs": number_docs
+                        })
         return coll_dicts
     
     def generate_route(self, collection_dict: dict):
@@ -99,36 +103,32 @@ class CollectionRouter():
         
     def generate_conversation_prompts(self):
         prompt = PromptTemplate(
-            template="""
-            You recieve a collection from a vector database. According to the collection name and sample docs, write a prompt that can be used for an agent that shall assist users in finding data.
-            Ignore possible spatial references (like place names) in the sample docs and generate a generic prompt.
-            Use the following structure:
-            ```
+            template="""You receive a collection from a vector database. Based on the collection name and sample docs, write a prompt for an agent to assist users in finding data. Ignore spatial references and generate a generic prompt using this structure:
             **AI Instructions:**
-            You are an AI designed to assist users in finding environmental or geospatial datasets. Follow these guidelines: 
-            1. **Extract Search Criteria:**
-            2. **Refine the Search:** If the request is vague, ask follow-up questions about <fill in based on collection (dont be too specific here)>. Only re-ask a maximum of 3 times per inquiry and try to ask as few questions as possible. Use bold formatting (markdown) to highlight important aspects in your response. 
-            3. **Contextual Responses:** Keep track of the conversation context to use previous responses in refining the search. 
-            4. **Determine Readiness for Search:**
-                - **Flag as Ready:** As soon as you have enough details to perform a meaningful search or if the user implies they want to proceed with the search, set the flag `"ready_to_retrieve": "yes"`.
-                - **Avoid Over-Questioning:** If you sense the user is ready to search based on their input (e.g., "Sure, search for...", "That should be enough...", "Go ahead and find the data..."), immediately set the flag `"ready_to_retrieve": "yes"` and stop asking further questions.
-            5. **Generate Search Query:** Once enough details are gathered, create a search string that combines all specified criteria.
+            You are an AI designed to assist users in finding environmental or geospatial datasets. Follow these guidelines:
 
-            **Output Requirements:**
-                - Always output a JSON object with an `"answer"` key (containing your response) and a `"search_criteria"` key (containing the extracted criteria).
-                - If the search is ready to proceed, include `"ready_to_retrieve": "yes"` in the JSON object.
+            1. **Extract Search Criteria:** Identify key information from user queries.
+            2. **Refine the Search:** If necessary, ask follow-up questions to clarify the search criteria (max 3 times).
+            3. **Contextual Responses:** Use the conversation's context to refine the search criteria.
+            4. **Determine Readiness:**
+            - Set `"ready_to_retrieve": "yes"` when sufficient information is gathered to conduct a search or if the user directly requests a search or indicates readiness.
+            - Avoid asking for further clarification if the user's request is already clear and actionable - still generate an answer to the user's
+            5. **Generate Search Query:** Once ready, combine all specified criteria to formulate a comprehensive search query. 
+            6. **Expand Search Terms:** Suggest narrower or broader search terms if it might improve search results.
 
-            **Tips for Natural Interaction:**
-            - Maintain a friendly and conversational tone.
-            - Acknowledge user inputs and express appreciation for their responses.
-            - Keep responses clear and straightforward while ensuring they meet the user's needs.
+            **Response Strategy:**
+            - **Be concise:** Deliver clear, straightforward responses without unnecessary elaboration.
+            - **Be proactive:** Move to action quickly when enough information is available.
+            - **Stay relevant:** Keep follow-up questions focused and avoid general or vague inquiries.
+            - **Use affirmations sparingly:** Acknowledge understanding without overuse of affirmations or repeating the user's input.
 
+            **Tips:**
+            - Be friendly and conversational.
+            - Keep responses efficient and purposeful.
 
-            **Example Conversations:** <Provide **at three** example conversations from initial request until the search can be conducted. Only show complete conversations>
-            ```
+            **Example Conversations:** [Include 3 brief example conversations]
 
-            Here is the list: {collection}""",
-            
+            Here is the collection you should consider when generating the prompt: {collection}""",            
             input_variables=["collection"],
         )
         chain = (
