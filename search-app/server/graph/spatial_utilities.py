@@ -12,8 +12,8 @@ nest_asyncio.apply()
 # Define your desired data structure.
 class SpatialEntity(BaseModel):
     original_query: str = Field(description="Get original query as prompted by the user")
-    spatial: str = Field(description="Get the spatial entity. Can be a location or place or a region")
-    scale: str = Field(description="Get the spatial scale")
+    spatial: str = Field(description="Get the spatial entity. Can be a location or place or a region. Leave empty if nothing is found.")
+    scale: str = Field(description="Get the spatial scale. Leave empty if nothing is found")
 
 # Set up a parser + inject instructions into the prompt template.
 spatial_context_prompt_parser = JsonOutputParser(pydantic_object=SpatialEntity)
@@ -21,7 +21,7 @@ spatial_context_prompt_parser = JsonOutputParser(pydantic_object=SpatialEntity)
 spatial_context_prompt = PromptTemplate(
     template="""
     You are an expert in geography and spatial data. 
-    Your task is to extract from a query spatial entities such as city, country or region names.
+    Your task is to extract from a query spatial entities such as city, country or region names (if possible).
     Also determine the spatial scale ("Local", "City", "Regional", "National", "Continental", "Global") from the given query.
 
     Output:{format_instructions}\n{query}\n""",
@@ -56,8 +56,11 @@ def search_with_osm_query(original_query: str, spatial: str, scale: str):
     """
     Use query and search in osm
     """
-    query_dict = {'spatial': spatial, 'scale': scale}
-    results = asyncio.run(query_osm_async(query_dict))
+    if spatial and scale:
+        query_dict = {'spatial': spatial, 'scale': scale}
+        results = asyncio.run(query_osm_async(query_dict))
+    else: 
+        results = []
     return {"original_query": original_query, "scale": scale, "results": results}
 
 osm_picker_prompt = PromptTemplate(

@@ -8,7 +8,8 @@ from indexing.indexer import Indexer
 from connectors.pygeoapi_retriever import PyGeoAPI
 from connectors.geojson_osm import GeoJSON
 from langchain.schema import Document
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
+
 from fastapi.middleware.cors import CORSMiddleware
 from .utils import (SessionData, cookie, verifier, backend, 
                     calculate_bounding_box, summarize_feature_collection_properties, 
@@ -74,12 +75,13 @@ indexes = {
 
 # Add connection to local file including building features 
 # Replace the value for tag_name argument if you have other data 
+"""
 geojson_osm_connector = GeoJSON(tag_name="building")
 """
 # We can also use a osm/geojson that comes from a web resource
-local_file_connector = GeoJSON(file_dir="https://webais.demo.52north.org/pygeoapi/collections/dresden_buildings/items",
+geojson_osm_connector = GeoJSON(file_dir="https://webais.demo.52north.org/pygeoapi/collections/dresden_buildings/items",
                                tag_name="building")
-"""
+
 
 # Adding conversational routes. We do this here to avoid time-expensive llm calls during inference:
 collection_router = CollectionRouter()
@@ -121,6 +123,7 @@ async def del_session(response: Response, session_id: UUID = Depends(cookie)):
     cookie.delete_from_response(response)
     return "deleted session"
 
+
 @app.post("/create_session")
 async def create_session(response: Response):
     session = uuid4()
@@ -130,6 +133,8 @@ async def create_session(response: Response):
 
     graph = SpatialRetrieverGraph(state=State(messages=[], 
                                               search_criteria="", 
+                                              broader_terms="",
+                                              narrower_terms="",
                                               spatio_temporal_context={},
                                               search_results=[], 
                                               ready_to_retrieve=""), 
@@ -153,14 +158,31 @@ class Query(BaseModel):
     
 @app.post("/data")
 async def call_graph(query_data: Query, session_id: UUID = Depends(cookie)):
+    thread_id = str(session_id)
     if graph is not None:
-        print(f"-#-#--Running graph---- Using session_id: {str(session_id)}")
+        # Add an explicit reset command 
+        if query_data.query == 'reset':
+            if graph.graph.memory.conn.is_alive():
+                async with graph.graph.memory.conn.cursor() as cur:
+                    # Check if checkpoints exist
+                    await cur.execute(f"SELECT * FROM checkpoints WHERE thread_id = '{thread_id}';")
+                    checkpoints = await cur.fetchall()
+                    if checkpoints:
+                        await cur.execute(f"DELETE FROM checkpoints WHERE thread_id = '{thread_id}' ;")
+                        return {"messages": [AIMessage(content="Okay, let's start a new search. What kind of data are you looking for?")]}
+                
+                    else:
+                        return {"messages": "No previous chat history"}
+            else:
+                return {"messages": "No previous chat history"}
+            
+        print(f"-#-#--Running graph---- Using session_id: {thread_id}")
         inputs = {"messages": [HumanMessage(content=query_data.query)]}
 
         if query_data.spatio_temporal_context:
             inputs['spatio_temporal_context'] = query_data.spatio_temporal_context
 
-        graph.graph.thread_id = str(session_id)
+        graph.graph.thread_id = thread_id
         response = await graph.ainvoke(inputs)
     else:
         raise HTTPException(status_code=400, detail="No session created")

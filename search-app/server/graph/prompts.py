@@ -6,7 +6,7 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 
-def generate_conversation_prompt(system_prompt=None):
+def generate_conversation_prompt(format_instructions, system_prompt=None):
     if not system_prompt:
         logging.info("Using default system prompt")
         system_prompt =  """
@@ -19,10 +19,12 @@ def generate_conversation_prompt(system_prompt=None):
                 - **Flag as Ready:** As soon as you have enough details to perform a meaningful search or if the user implies they want to proceed with the search, set the flag `"ready_to_retrieve": "yes"`.
                 - **Avoid Over-Questioning:** If you sense the user is ready to search based on their input (e.g., "Sure, search for...", "That should be enough...", "Go ahead and find the data..."), immediately set the flag `"ready_to_retrieve": "yes"` and stop asking further questions.
             5. **Generate Search Query:** Once enough details are gathered, create a search string that combines all specified criteria.
+            6. **Add narrower/broader search terms:** Next to the search string, generate narrower/broader search strings that could improve the search results.
 
         **Output Requirements:**
-            - Always output a JSON object with an `"answer"` key (containing your response) and a `"search_criteria"` key (containing the extracted criteria).
+            - Always output a **VALID JSON** object with an `"answer"` key (containing your response) and a `"search_criteria"` key (containing the extracted criteria).
             - If the search is ready to proceed, include `"ready_to_retrieve": "yes"` in the JSON object.
+            - Add narrower search strings to `"narrower_terms"`, and broader terms to "`broader_terms`"
 
         **Tips for Natural Interaction:**
         - Maintain a friendly and conversational tone.
@@ -71,23 +73,25 @@ def generate_conversation_prompt(system_prompt=None):
         """
     else:
         logging.info("Using custom system prompt")
-        
 
+    # It appears that its necessary to have the prompt in triple-quotes
+    system_prompt = system_prompt.replace("\\n", "\n").replace("\\'", "'")
+        
     prompt = ChatPromptTemplate.from_messages(
         [
             (
-                "system",
-                system_prompt,
+                "system", system_prompt
             ),
             MessagesPlaceholder(variable_name="chat_history"),
-            ("human", "{input}"),
+            ("human", "{format_instructions}\n{input}"),
         ],
     )
     
     # Explicitely setting the input variables here because sometimes it was hallucinating other input variables.
     prompt.input_variables = ['chat_history', 'input']
+    prompt.partial_variables = {"format_instructions": format_instructions}
     prompt.messages[0].prompt.input_variables=[]
-
+    
     return prompt
 
 
@@ -95,8 +99,11 @@ def generate_final_answer_prompt():
     final_answer_prompt = PromptTemplate(
         template="""
         You describe the results of a data search given a certain query.
-        The search results are either the found datasets or a summary of the recieved data. 
-        Use three sentences maximum and keep the answer concise
+        The search results are either the found datasets or a summary of the recieved data.
+        Use a natural and onversational tone and do not repeat the query in your response. 
+        
+        **Use three sentences maximum and keep the answer concise**
+        
         Question: {query} 
         Found data: {context} 
         Answer:""",

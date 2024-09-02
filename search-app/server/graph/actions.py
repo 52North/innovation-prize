@@ -10,11 +10,20 @@ from langchain_openai import ChatOpenAI
 from config.config import Config
 from langchain_openai import OpenAI
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.output_parsers import JsonOutputParser
+from langchain.output_parsers import OutputFixingParser
 import json
 from langchain.tools import tool
+from langchain_core.pydantic_v1 import BaseModel, Field
 from typing import Literal
 import requests
 import logging
+from semantic_router import Route
+from semantic_router.encoders import OpenAIEncoder
+from semantic_router.layer import RouteLayer
+import os
+from langchain_groq import ChatGroq
+
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
@@ -24,11 +33,26 @@ config = Config('./config/config.json')
 
 OPENAI_API_KEY = config.openai_api_key
 TAVILY_API_KEY = config.tavily_api_key
+GROQ_API_KEY = config.groq_api_key
 
-llm_with_structured_output = ChatOpenAI(model="gpt-3.5-turbo-0125",
-                 model_kwargs={ "response_format": { "type": "json_object" } })
+os.environ['GROQ_API_KEY'] = GROQ_API_KEY
+os.environ['OPENAI_API_KEY'] = OPENAI_API_KEY
+os.environ['TAVILY_API_KEY'] = TAVILY_API_KEY
 
-llm_unstructured, final_answer_llm = OpenAI(temperature=0),  OpenAI(temperature=0)
+llm = ChatGroq(
+    model="llama-3.1-8b-instant",
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
+    # other params...
+)
+# llm = ChatOpenAI(model="gpt-3.5-turbo-0125")
+
+# llm_with_structured_output = ChatOpenAI(model="gpt-3.5-turbo-0125",
+#                  model_kwargs={ "response_format": { "type": "json_object" } })
+
+llm_unstructured, final_answer_llm = OpenAI(temperature=0, openai_api_key=OPENAI_API_KEY),  OpenAI(temperature=0, openai_api_key=OPENAI_API_KEY)
 
 
 def is_valid_json(myjson):
@@ -38,9 +62,52 @@ def is_valid_json(myjson):
         return False
     return True
 
+
+# check if conversational:
+routes = [Route(
+    name="chitchat",
+    utterances=[
+        "hello",
+        "hi",
+        "how's the weather today?",
+        "how are things going?",
+        "lovely weather today",
+        "the weather is horrendous",
+        "let's go to the chippy",
+    ],
+)]
+encoder = OpenAIEncoder()
+
+def check_if_conversational(input_str: str) -> bool:
+    rl = RouteLayer(encoder=encoder, routes=routes)
+    route_choice = rl(input_str)
+    if route_choice.name == 'chitchat':
+        return True
+    else:
+        return False
+
+# Define the conversation output data structure.
+class ResponseSchema(BaseModel):
+    answer: str = Field(description="Your response to the user. Seek for something useful in the input you recieve")
+    search_criteria: str = Field(description="List of extracted search criteria.")
+    ready_to_retrieve: str = Field(description="'yes' if ready to search, 'no' if more information is needed")
+    narrower_terms: str = Field(description="List of more specific search terms.")
+    broader_terms: str = Field(description="List of more general search terms.")
+
 def run_converstation_chain(input: str, chat_history, prompt=None):
+    output_parser = JsonOutputParser(pydantic_object=ResponseSchema)
+    output_fixer = OutputFixingParser.from_llm(parser=output_parser, llm=llm)
+
+    format_instructions = output_parser.get_format_instructions()
+
+    dynamic_prompt = generate_conversation_prompt(format_instructions=format_instructions, system_prompt=prompt)
+
     # Chains
-    conversation_chain = generate_conversation_prompt(system_prompt=prompt)| llm_with_structured_output 
+    conversation_chain = (        
+        dynamic_prompt
+        | llm 
+        #| output_parser
+    ) 
 
     logging.info(f"input to converation chain: {input}")
 
@@ -48,14 +115,14 @@ def run_converstation_chain(input: str, chat_history, prompt=None):
         {"input": input,
          "chat_history": chat_history}
     )
-    if history.content and is_valid_json(history.content):
-        parsed_dict = json.loads(history.content)
-    else: parsed_dict = {}
+    logging.info(f"Output before parsing: {history.content}")
+    parsed_output = output_fixer.parse(history.content)
+    logging.info(f"Output after parsing: {parsed_output}")
+    return parsed_output
 
-    return history, parsed_dict
 
 final_answer_chain = (
-    generate_final_answer_prompt() | final_answer_llm | StrOutputParser()
+    generate_final_answer_prompt() | llm | StrOutputParser()
 )
 
 
