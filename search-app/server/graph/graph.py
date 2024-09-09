@@ -211,7 +211,7 @@ class SpatialRetrieverGraph(StateGraph):
         return state
 
     def should_continue(self, state: State) -> str:
-        if state.get("ready_to_retrieve") == "yes":
+        if state.get("ready_to_retrieve") == "yes" and state['search_criteria']:
             print("---routing to spatial context extractor, then to search")
             return "extract_spatio_temporal_context"
         else:
@@ -226,6 +226,7 @@ class SpatialRetrieverGraph(StateGraph):
                 search_index_info.pop('sample_docs', None)
             try:
                 search_results = []
+                # Todo: do not hard code index name here
                 if state["index_name"] == "geojson":
                     query_bbox = state['spatio_temporal_context']
 
@@ -244,8 +245,11 @@ class SpatialRetrieverGraph(StateGraph):
 
                 else:
                     search_results = state["search_results"][:10]
+
+                    logging.info(f"search results: {search_results}")
                     doc_contents = "\n\n".join(
-                        doc['page_content'] for doc in search_results)
+                        doc.page_content for doc in search_results)
+                    
                     context = f"Searched index: {search_index_info}. Top-{len(search_results)} results: {doc_contents}"
 
                 if not search_results:

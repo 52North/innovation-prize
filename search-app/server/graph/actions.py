@@ -39,15 +39,16 @@ os.environ['GROQ_API_KEY'] = GROQ_API_KEY
 os.environ['OPENAI_API_KEY'] = OPENAI_API_KEY
 os.environ['TAVILY_API_KEY'] = TAVILY_API_KEY
 
+"""
 llm = ChatGroq(
-    model="llama-3.1-8b-instant",
+    model="llama3-70b-8192",
     temperature=0,
     max_tokens=None,
     timeout=None,
     max_retries=2,
     # other params...
-)
-# llm = ChatOpenAI(model="gpt-3.5-turbo-0125")
+)"""
+llm = ChatOpenAI(model="gpt-3.5-turbo-0125")
 
 # llm_with_structured_output = ChatOpenAI(model="gpt-3.5-turbo-0125",
 #                  model_kwargs={ "response_format": { "type": "json_object" } })

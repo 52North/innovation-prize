@@ -59,12 +59,13 @@ class GeoJSON():
         _features_to_docs() -> List[Document]: 
             Converts features into a list of Document objects for further use.
     """
-    def __init__(self, file_dir: str = None, tag_name: str = None):        
-        if file_dir and is_url(file_dir):
+    def __init__(self, file_dir: str = None, tag_name: str = None):     
+        self.file_dir = file_dir   
+        if self.file_dir and is_url(self.file_dir):
             """We assume the online resource to be a collection published via a PyGeoAPI instance"""
-            logging.info("Getting features from online resource")
+            logging.info("Fetching GeoJSON features from online resource. This may take a few minutes.")
             params = {"f": "json", "limit": 10000}
-            gj = self._fetch_features_from_online_resource(file_dir, params)
+            gj = self._fetch_features_from_online_resource(params)
             print(f"Retrieved {len(gj)} features")
             self.tag_name = tag_name
             if self.tag_name:
@@ -72,11 +73,11 @@ class GeoJSON():
             else:
                 self.features = gj
         else:
-            if not file_dir:
-                file_dir = config.local_geojson_files
-            logging.info(f"Looking for files in following dir: {file_dir[0]}")
+            if not self.file_dir:
+                self.file_dir = config.local_geojson_files[0]
+            logging.info(f"Looking for files in following dir: {self.file_dir}")
             gj_files = []
-            for file in glob.glob(f"{file_dir[0]}*.geojson"):
+            for file in glob.glob(f"{self.file_dir}*.geojson"):
                 logging.info(f"Extracting features from file: {file}")
                 with open(file) as f:
                     gj = geojson.load(f)
@@ -94,7 +95,7 @@ class GeoJSON():
 
         while True:
             params['offset'] = offset
-            response = requests.get(url, params=params)
+            response = requests.get(self.file_dir, params=params)
             response_json = response.json()
             features = response_json.get('features', [])
             if not features:
@@ -215,11 +216,15 @@ class GeoJSON():
         for tag, features in grouped_features.items():
             tag_description = features[0]['properties'].get('description', tag.replace('=', ': '))
             page_content = f"{tag}: {tag_description}\n\nThis collection includes {len(features)} features of type {tag}."
+            if is_url(self.file_dir):
+                source = self.file_dir.replace("/items", "")
+            else:
+                source = "Feature collection hosted from local GeoJSON"
             metadata = {
                 "tag": tag,
                 "count": len(features),
                 "features": self._convert_to_geojson(features),
-                "url": "url"  # Update this with the actual URL if needed
+                "url": source  # Update this with the actual URL if needed
             }
             tag_docs.append(Document(page_content=page_content, metadata=metadata))
 

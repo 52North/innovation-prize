@@ -28,7 +28,6 @@ import logging
 from typing import Optional, Dict, Any
 
 
-
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
@@ -66,21 +65,21 @@ indexes = {
                         score_treshold= 0.4,
                         k = 20),
     "geojson": Indexer(index_name="geojson", # Add indexer for local geojson with OSM features
-                             score_treshold=-400.0, 
+                             score_treshold=0.4, 
                              k = 20,
-                             use_hf_model=True,
-                             embedding_model="Alibaba-NLP/gte-large-en-v1.5"
+                             # use_hf_model=True,
+                             # embedding_model="Alibaba-NLP/gte-large-en-v1.5"
                             )
 }
 
 # Add connection to local file including building features 
 # Replace the value for tag_name argument if you have other data 
-"""
+
 geojson_osm_connector = GeoJSON(tag_name="building")
-"""
+
 # We can also use a osm/geojson that comes from a web resource
-geojson_osm_connector = GeoJSON(file_dir="https://webais.demo.52north.org/pygeoapi/collections/dresden_buildings/items",
-                               tag_name="building")
+# geojson_osm_connector = GeoJSON(file_dir="https://webais.demo.52north.org/pygeoapi/collections/dresden_buildings/items",
+#                                tag_name="building")
 
 
 # Adding conversational routes. We do this here to avoid time-expensive llm calls during inference:
@@ -144,7 +143,7 @@ async def create_session(response: Response):
                                               collection_router=collection_router,
                                               conversational_prompts=conversational_prompts
                                               ).compile()
-
+    
     data = SessionData(session_id=session_id)
 
     await backend.create(session, data)
@@ -201,6 +200,12 @@ async def fetch_documents(indexing: bool=True, api_key: APIKey = Depends(get_api
         # Indexing received docs
         logging.info("Indexing fetched documents in pygeoapi index")
         res_pygeoapi = indexes["pygeoapi"]._index(documents=pygeoapi_docs)
+
+        # In case the collection changes significantly, also update the custom prompts
+        if (res_pygeoapi["num_added"] > 20) or (res_pygeoapi["updated"] > 20):
+            collection_router.setup()
+            load_conversational_prompts(collection_router=collection_router)
+
     
     return {'indexing_results': {
         'pygeoapi': res_pygeoapi,
@@ -213,6 +218,12 @@ async def index_geojson_osm(api_key: APIKey = Depends(get_api_key)):
     feature_docs = await geojson_osm_connector._features_to_docs()
     logging.info(f"Converted {len(feature_docs)} Features or FeatureGroups to documents")
     res_local = indexes['geojson']._index(documents=feature_docs)
+
+    if (res_local["num_added"] > 20) or (res_local["updated"] > 20):
+        collection_router.setup()
+        load_conversational_prompts(collection_router=collection_router)
+
+
     return res_local
 
 def generate_combined_feature_collection(doc_list: List[Document]):

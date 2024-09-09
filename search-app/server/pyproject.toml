@@ -9,11 +9,23 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.10,<3.13"
 uvicorn = "^0.23.2"
 langserve = {extras = ["server"], version = ">=0.0.30"}
-pydantic = "<2"
-
+pydantic = "2.7.2"
+langgraph = "<=0.0.69"
+langchain_community = "<=0.2.1"
+langchain-openai = "<=0.1.8"
+langchain-groq = "<=0.1.4"
+aiosqlite = "^0.20.0"
+nest-asyncio = "^1.6.0"
+semantic-router = "0.0.20"
+chromadb = "^0.5.5"
+geojson = "^3.1.0"
+bs4 = "^0.0.1"
+fastapi_sessions = "^0.3.2"
+gpt4all = "2.8.2"
+sentence-transformers = "^3.0.1"
 
 [tool.poetry.group.dev.dependencies]
 langchain-cli = ">=0.0.15"

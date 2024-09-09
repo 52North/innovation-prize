@@ -146,12 +146,16 @@ def write_dict_to_file(dictionary, filename):
 
 def load_conversational_prompts(collection_router):
     loaded_dict = read_dict_from_module('./graph/custom_prompts/custom_prompts.py')
+    if not collection_router.coll_dicts:
+        logging.info("No collections in vector store. Not generating individual prompts")
+        return {}
+
     collection_names = [c['collection_name'] for c in collection_router.coll_dicts]
 
     if loaded_dict and set(loaded_dict.keys()) == set(collection_names):
         logging.info("Custom prompts already generated for current collections. Reading it from file...")
         conversational_prompts = loaded_dict
-    else:    
+    else:   
         conversational_prompts = collection_router.generate_conversation_prompts()
         write_dict_to_file(conversational_prompts,'./graph/custom_prompts/custom_prompts.py')
     

@@ -22,12 +22,14 @@ OPENAI_API_KEY = config.openai_api_key
 
 class CollectionRouter():
     def __init__(self, persist_dir: str="../server/chroma_db"):
+        self.persist_dir = persist_dir
         self.llm = ChatOpenAI(model="gpt-4o-mini")
         self.encoder = OpenAIEncoder()
+        self.setup()
 
-        self.coll_dicts = self.get_collection_info(persist_dir=persist_dir)
+    def setup(self):
+        self.coll_dicts = self.get_collection_info(persist_dir=self.persist_dir)
         self.routes = [self.generate_route(collection_dict=coll) for coll in self.coll_dicts]
-
         self.rl = RouteLayer(encoder=self.encoder, routes=self.routes)
 
     def get_collection_info(self, persist_dir: str) -> dict:
@@ -46,6 +48,9 @@ class CollectionRouter():
                 if c.name != "langchain":
                     coll = client.get_collection(c.name)
                     number_docs = coll.count()
+                    if number_docs == 0:
+                        logging.info(f"Collection {c.name} has no indexed records")
+                        continue                    
                     top_10_docs = coll.peek()
                     sample_docs = top_10_docs["documents"]
                     unique_keys = {key for d in top_10_docs['metadatas'] for key in d.keys()}
@@ -102,8 +107,11 @@ class CollectionRouter():
         return route
         
     def generate_conversation_prompts(self):
+        if not self.coll_dicts:
+            return {}
         prompt = PromptTemplate(
-            template="""You receive a collection from a vector database. Based on the collection name and sample docs, write a prompt for an agent to assist users in finding data. Ignore spatial references and generate a generic prompt using this structure:
+            template="""You receive a collection from a vector database. Based on the collection name and sample docs, write a prompt for an agent to assist users in finding data. 
+            Ignore spatial references and generate a generic prompt (with utf-8 characters only) using this structure:
             **AI Instructions:**
             You are an AI designed to assist users in finding environmental or geospatial datasets. Follow these guidelines:
 
@@ -138,5 +146,5 @@ class CollectionRouter():
         )
         
         logging.info("Generating individual prompts for all collections")
-        prompts = {c['collection_name']: chain.invoke({"collection": c}) for c in self.coll_dicts}
+        prompts = {c['collection_name']: chain.invoke({"collection": c}) for c in self.coll_dicts if c['number_docs'] > 0}
         return prompts

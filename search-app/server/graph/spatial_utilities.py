@@ -4,10 +4,7 @@ from langchain.prompts import PromptTemplate
 from langchain.tools import tool
 import aiohttp
 import asyncio
-import nest_asyncio
 
-# Allow nested asyncio.run calls
-nest_asyncio.apply()
 
 # Define your desired data structure.
 class SpatialEntity(BaseModel):
