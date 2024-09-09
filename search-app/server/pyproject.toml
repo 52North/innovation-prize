@@ -9,7 +9,11 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
+<<<<<<< HEAD
 python = ">=3.10,<3.13"
+=======
+python = ">=3.11,<3.13"
+>>>>>>> 5eceb56a867f50d64779dbfac5ec5267ff2cd465
 uvicorn = "^0.23.2"
 langserve = {extras = ["server"], version = ">=0.0.30"}
 pydantic = "2.7.2"
