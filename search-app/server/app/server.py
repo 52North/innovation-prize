@@ -7,6 +7,7 @@ from config.config import Config
 from indexing.indexer import Indexer
 from connectors.pygeoapi_retriever import PyGeoAPI
 from connectors.geojson_osm import GeoJSON
+from result_explainer.search_result_explainer import SimilarityExplainer
 from langchain.schema import Document
 from langchain_core.messages import HumanMessage, AIMessage
 
@@ -290,6 +291,21 @@ async def remove_doc_from_index(index_name: str, _id: str, api_key: APIKey = Dep
     result = indexes[index_name]._delete_doc_from_index(_id)
     return result
 
+class ExplainerContext(BaseModel):
+    index_name: str
+    query: str
+    documents: List[Document]
+
+@app.post("/explain_results")
+async def explain_results(context: ExplainerContext):
+                # Try to explain results
+    explainer = SimilarityExplainer(search_index=indexes[context.index_name])
+    for result in context.documents:
+        importance_scores = explainer.explain_similarity(context.query, result.page_content)
+        result.metadata['relevant_words'] = importance_scores
+            
+    return context.documents
+    
 # Edit this to add the chain you want to add
 # add_routes(app, call_graph, path="/data")
 

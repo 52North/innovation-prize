@@ -20,6 +20,7 @@ class Indexer():
             k: int = 3,
             score_treshold: float = 0.6,
         ):
+        self.use_hf_model = use_hf_model
         self.index_name = index_name
         self.embedding_model = embedding_model
 
