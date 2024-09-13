@@ -201,7 +201,6 @@ class SpatialRetrieverGraph(StateGraph):
                                                         "search_index": search_index,
                                                         "search_type": "similarity",
                                                         "k": 20})
-
         else:  # web search
             tavily_search = TavilySearchResults()
             search_results = await tavily_search.ainvoke(state["search_criteria"])
@@ -287,3 +286,4 @@ class SpatialRetrieverGraph(StateGraph):
         if history:
             return history
         return None
+

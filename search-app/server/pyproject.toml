@@ -26,6 +26,7 @@ bs4 = "^0.0.1"
 fastapi_sessions = "^0.3.2"
 gpt4all = "2.8.2"
 sentence-transformers = "^3.0.1"
+shap = "^0.46.0"
 
 [tool.poetry.group.dev.dependencies]
 langchain-cli = ">=0.0.15"
