@@ -74,7 +74,7 @@ def generate_conversation_prompt(format_instructions, system_prompt=None):
     else:
         logging.info("Using custom system prompt")
 
-    # It appears that its necessary to have the prompt in triple-quotes
+    # It appears that its necessary to have the prompt formated as it would be with triple-quotes
     system_prompt = system_prompt.replace("\\n", "\n").replace("\\'", "'")
         
     prompt = ChatPromptTemplate.from_messages(

@@ -14,7 +14,7 @@ from langchain_core.output_parsers import JsonOutputParser
 from langchain.output_parsers import OutputFixingParser
 import json
 from langchain.tools import tool
-from langchain_core.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 from typing import Literal
 import requests
 import logging
@@ -39,7 +39,7 @@ os.environ['GROQ_API_KEY'] = GROQ_API_KEY
 os.environ['OPENAI_API_KEY'] = OPENAI_API_KEY
 os.environ['TAVILY_API_KEY'] = TAVILY_API_KEY
 
-"""
+
 llm = ChatGroq(
     model="llama3-70b-8192",
     temperature=0,
@@ -47,8 +47,8 @@ llm = ChatGroq(
     timeout=None,
     max_retries=2,
     # other params...
-)"""
-llm = ChatOpenAI(model="gpt-3.5-turbo-0125")
+)
+# llm = ChatOpenAI(model="gpt-3.5-turbo-0125")
 
 # llm_with_structured_output = ChatOpenAI(model="gpt-3.5-turbo-0125",
 #                  model_kwargs={ "response_format": { "type": "json_object" } })
@@ -116,9 +116,7 @@ def run_converstation_chain(input: str, chat_history, prompt=None):
         {"input": input,
          "chat_history": chat_history}
     )
-    logging.info(f"Output before parsing: {history.content}")
     parsed_output = output_fixer.parse(history.content)
-    logging.info(f"Output after parsing: {parsed_output}")
     return parsed_output
 
 
@@ -166,7 +164,7 @@ def generate_search_tool(coll_dict):
                                          "similarity_score_threshold"]="similarity",
                     score_treshold: float=0.5,
                     k: int=20):
-        """"""
+        """ """
 
         search_kwargs={"score_threshold": score_treshold,
                        "k": k}

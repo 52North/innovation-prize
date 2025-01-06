@@ -2,9 +2,11 @@ from typing import Annotated, Sequence, TypedDict, List
 from langchain_core.messages import BaseMessage
 from langgraph.graph import END, StateGraph
 import operator
-from langchain_core.messages import AIMessage
-from langchain_community.tools.tavily_search import TavilySearchResults
-from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
+from langchain_core.messages import AIMessage, HumanMessage
+#from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_community.tools import TavilySearchResults
+#from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 import json
 from datetime import datetime
 from .actions import (
@@ -20,6 +22,8 @@ from .spatial_utilities import check_within_bbox
 import logging
 import ast
 from functools import lru_cache
+from typing import Type
+from uuid import UUID, uuid4
 
 
 logging.basicConfig()
@@ -34,8 +38,11 @@ def is_valid_json(myjson):
     return True
 
 
+def replace_messages(existing, new):
+    return new
+
 class State(TypedDict):
-    messages: Annotated[Sequence[BaseMessage], operator.add]
+    messages: Annotated[Sequence[BaseMessage], replace_messages]
     search_criteria: str
     broader_terms: str
     narrower_terms: str
@@ -54,8 +61,10 @@ class SpatialRetrieverGraph(StateGraph):
                  collection_router,
                  conversational_prompts: dict = None
                  ):
-        super().__init__(state)
+        super().__init__(State)
+
         self.setup_graph()
+
         self.counter = 0
         self.thread_id = thread_id
         self.memory = memory
@@ -114,9 +123,13 @@ class SpatialRetrieverGraph(StateGraph):
             print("---start conversation (with history)")
             chat_history = [
                 message for h in history_from_memory for message in h['messages']]
+            
+            chat_history.append(HumanMessage(content=state["messages"][-1].content))
+            
+            logging.info(f"Messages after loading history: {chat_history}")
         else:
             print("---start conversation (no previous messages)")
-            chat_history = []
+            chat_history = [HumanMessage(content=state["messages"][-1].content)]
 
         # Check if user just inputs a conversational message, such as "hello". In this case we take a shortcut.
         if len(chat_history) < 5:
@@ -143,12 +156,23 @@ class SpatialRetrieverGraph(StateGraph):
                                            chat_history=chat_history,
                                            prompt=prompt)
 
+   
+
+        chat_history.append(AIMessage(content=response.get("answer")))
+
         state["messages"].append(AIMessage(content=response.get("answer")))
+
+        logging.info(f"Chat history: {chat_history}")
+        logging.info(f"State messages at the end: {state['messages']}")
+
+        state["messages"] = chat_history
+
         state["search_criteria"] = response.get("search_criteria", "")
         state["ready_to_retrieve"] = response.get(
             "ready_to_retrieve", "no").lower()
         state["narrower_terms"] = response.get("narrower_terms", "")
         state["broader_terms"] = response.get("broader_terms", "")
+
         return state
 
     async def extract_spatio_temporal_context(self, state: State):
@@ -214,6 +238,7 @@ class SpatialRetrieverGraph(StateGraph):
             print("---routing to spatial context extractor, then to search")
             return "extract_spatio_temporal_context"
         else:
+            print("---routing to save state")
             return "human"
 
     async def final_answer(self, state: State):
@@ -273,15 +298,25 @@ class SpatialRetrieverGraph(StateGraph):
     async def save_state(self, state: State):
         print(f"---saving state for thread: {self.thread_id}")
 
-        checkpoint = {"ts": self._get_current_timestamp(), "data": state}
-        config = {"configurable": {"thread_id": self.thread_id}}
-        await self.memory.aput(config=config, checkpoint=checkpoint)
+        checkpoint = {"ts": self._get_current_timestamp(), 
+                      "data": state,
+                      "id":  self.thread_id}
+        
+        config = {"configurable": {"thread_id": self.thread_id, 
+                                   "checkpoint_ns": ""}}
+        async with AsyncSqliteSaver.from_conn_string("checkpoint.db") as memory:
+            # await memory.aput(config=config, checkpoint=checkpoint)
+            await memory.aput(config, checkpoint, {}, {})
 
         return state
 
     async def _get_history_from_memory(self):
         config = {"configurable": {"thread_id": self.thread_id}}
-        history = [checkpoint.checkpoint["data"] async for checkpoint in self.memory.alist(config=config)]
+
+        async with AsyncSqliteSaver.from_conn_string("checkpoint.db") as memory:
+            history = [c.checkpoint.get('data') async for c in memory.alist(config)]
+
+        # history = [checkpoint.checkpoint["data"] async for checkpoint in self.memory.alist(config=config)]
         print(f"---retrieving state for thread: {self.thread_id}")
         if history:
             return history

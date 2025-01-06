@@ -12,14 +12,18 @@ from langchain.schema import Document
 from langchain_core.messages import HumanMessage, AIMessage
 
 from fastapi.middleware.cors import CORSMiddleware
-from .utils import (SessionData, cookie, verifier, backend, 
-                    calculate_bounding_box, summarize_feature_collection_properties, 
+from .utils import (SessionData, cookie, verifier, backend,
+                    calculate_bounding_box, summarize_feature_collection_properties,
                     load_conversational_prompts)
 
-from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
+# from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+
+
 from fastapi import HTTPException, FastAPI, Depends, Response, Security
 from fastapi.security.api_key import APIKeyHeader, APIKey
-from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
+# from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
 from uuid import UUID, uuid4
 from typing import List
 import geojson
@@ -39,15 +43,18 @@ origins = [
 ]
 
 # Init memory:
-memory = AsyncSqliteSaver.from_conn_string(":memory:")
+memory_path = "checkpoint.db"
+memory = AsyncSqliteSaver.from_conn_string(memory_path)
 
-### Get session info via cookie
+# Get session info via cookie
+
+
 async def get_current_session(session_id: UUID = Depends(cookie), session_data: SessionData = Depends(verifier)):
     return session_data
 
 config = Config('./config/config.json')
 
-#Authentificate
+# Authentificate
 API_KEY = config.sdsa_api_key  # Replace with your actual API key
 API_KEY_NAME = "X-API-Key"
 
@@ -63,18 +70,18 @@ session_id = None
 # Create a dictionary of indexes
 indexes = {
     "pygeoapi": Indexer(index_name="pygeoapi",
-                        score_treshold= 0.4,
-                        k = 20),
-    "geojson": Indexer(index_name="geojson", # Add indexer for local geojson with OSM features
-                             score_treshold=0.4, 
-                             k = 20,
-                             # use_hf_model=True,
-                             # embedding_model="Alibaba-NLP/gte-large-en-v1.5"
-                            )
+                        score_treshold=0.4,
+                        k=20),
+    "geojson": Indexer(index_name="geojson",  # Add indexer for local geojson with OSM features
+                       score_treshold=0.4,
+                       k=20,
+                       # use_hf_model=True,
+                       # embedding_model="Alibaba-NLP/gte-large-en-v1.5"
+                       )
 }
 
-# Add connection to local file including building features 
-# Replace the value for tag_name argument if you have other data 
+# Add connection to local file including building features
+# Replace the value for tag_name argument if you have other data
 
 geojson_osm_connector = GeoJSON(tag_name="building")
 
@@ -86,9 +93,9 @@ geojson_osm_connector = GeoJSON(tag_name="building")
 # Adding conversational routes. We do this here to avoid time-expensive llm calls during inference:
 collection_router = CollectionRouter()
 
-# Check if already custom prompts generated and if yes: check if these match the existing search indexes 
-conversational_prompts = load_conversational_prompts(collection_router=collection_router)
-
+# Check if already custom prompts generated and if yes: check if these match the existing search indexes
+conversational_prompts = load_conversational_prompts(
+    collection_router=collection_router)
 
 
 app = FastAPI()
@@ -100,22 +107,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
 async def get_api_key(api_key_header: str = Security(api_key_header)):
     if api_key_header == API_KEY:
         return api_key_header
     raise HTTPException(status_code=403, detail="Could not validate API Key")
 
+
 @app.get("/")
 async def redirect_root_to_docs():
     return RedirectResponse("/docs")
 
-### Get session info via cookie
+# Get session info via cookie
+
+
 async def get_current_session(session_id: UUID = Depends(cookie), session_data: SessionData = Depends(verifier)):
     return session_data
+
 
 @app.get("/whoami", dependencies=[Depends(cookie)])
 async def whoami(session_data: SessionData = Depends(get_current_session)):
     return session_data
+
 
 @app.post("/delete_session")
 async def del_session(response: Response, session_id: UUID = Depends(cookie)):
@@ -144,7 +158,7 @@ async def create_session(response: Response):
                                               collection_router=collection_router,
                                               conversational_prompts=conversational_prompts
                                               ).compile()
-    
+
     data = SessionData(session_id=session_id)
 
     await backend.create(session, data)
@@ -152,51 +166,57 @@ async def create_session(response: Response):
 
     return {"message": f"created session for {session}"}
 
+
 class Query(BaseModel):
     query: str
     spatio_temporal_context: Optional[Dict[str, Any]] = None
-    
+
+
 @app.post("/data")
 async def call_graph(query_data: Query, session_id: UUID = Depends(cookie)):
     thread_id = str(session_id)
     if graph is not None:
-        # Add an explicit reset command 
+        # Add an explicit reset command
         if query_data.query == 'reset':
-            if graph.graph.memory.conn.is_alive():
-                async with graph.graph.memory.conn.cursor() as cur:
+            #if graph.memory.conn.is_alive():
+            if memory.conn.is_alive():
+                #async with graph.memory.conn.cursor() as cur:
+                async with memory.conn.cursor() as cur:
                     # Check if checkpoints exist
                     await cur.execute(f"SELECT * FROM checkpoints WHERE thread_id = '{thread_id}';")
                     checkpoints = await cur.fetchall()
                     if checkpoints:
                         await cur.execute(f"DELETE FROM checkpoints WHERE thread_id = '{thread_id}' ;")
                         return {"messages": [AIMessage(content="Okay, let's start a new search. What kind of data are you looking for?")]}
-                
+
                     else:
                         return {"messages": "No previous chat history"}
             else:
                 return {"messages": "No previous chat history"}
-            
+
         print(f"-#-#--Running graph---- Using session_id: {thread_id}")
         inputs = {"messages": [HumanMessage(content=query_data.query)]}
 
         if query_data.spatio_temporal_context:
             inputs['spatio_temporal_context'] = query_data.spatio_temporal_context
 
-        graph.graph.thread_id = thread_id
+        # graph.graph.thread_id = thread_id
+        graph.thread_id = thread_id
         response = await graph.ainvoke(inputs)
     else:
         raise HTTPException(status_code=400, detail="No session created")
     return response
 
+
 @app.get("/fetch_documents")
-async def fetch_documents(indexing: bool=True, api_key: APIKey = Depends(get_api_key)):
+async def fetch_documents(indexing: bool = True, api_key: APIKey = Depends(get_api_key)):
     docs_to_index = []
-    
+
     # Scrape from pygeoapi resources
     pygeoapi = PyGeoAPI()
     pygeoapi_docs = await pygeoapi.get_docs_for_all_instances()
     logging.info(f"Retrieved {len(pygeoapi_docs)} documents from pygeoapi")
-        
+
     if indexing:
         # Indexing received docs
         logging.info("Indexing fetched documents in pygeoapi index")
@@ -207,11 +227,11 @@ async def fetch_documents(indexing: bool=True, api_key: APIKey = Depends(get_api
             collection_router.setup()
             load_conversational_prompts(collection_router=collection_router)
 
-    
     return {'indexing_results': {
         'pygeoapi': res_pygeoapi,
-        }
     }
+    }
+
 
 @app.get("/index_geojson_osm_features")
 async def index_geojson_osm(api_key: APIKey = Depends(get_api_key)):
@@ -224,25 +244,27 @@ async def index_geojson_osm(api_key: APIKey = Depends(get_api_key)):
         collection_router.setup()
         load_conversational_prompts(collection_router=collection_router)
 
-
     return res_local
+
 
 def generate_combined_feature_collection(doc_list: List[Document]):
     features = []
     for doc in doc_list:
         if "feature" in doc.metadata:
-            feature = geojson.Feature(geometry=json.loads(doc.metadata["feature"]), properties=doc.metadata)
+            feature = geojson.Feature(geometry=json.loads(
+                doc.metadata["feature"]), properties=doc.metadata)
             features.append(feature)
-        
+
         elif "features" in doc.metadata:
             feature_collection = geojson.loads(doc.metadata['features'])
             feature_list = list(feature_collection['features'])
             features.extend(feature_list)
 
-    combined_feature_collection  = geojson.FeatureCollection(features)
+    combined_feature_collection = geojson.FeatureCollection(features)
     # geojson_str = geojson.dumps(combined_feature_collection, sort_keys=True, indent=2)
 
     return combined_feature_collection
+
 
 @app.get("/retrieve_geojson")
 async def retrieve_geojson(query: str):
@@ -255,7 +277,7 @@ async def retrieve_geojson(query: str):
 
     summary = f"""Summary of found features:
         {properties}
-    	
+
     Spatial Extent of all features: {spatial_extent}
     """
 
@@ -266,14 +288,14 @@ async def retrieve_geojson(query: str):
 async def clear_index(index_name: str, api_key: APIKey = Depends(get_api_key)):
     if index_name not in indexes and index_name != 'geojson':
         raise HTTPException(status_code=400, detail="Invalid index name")
-    
+
     if index_name == 'geojson':
         logging.info("Clearing geojson index")
         indexes['geojson']._clear()
     else:
         logging.info(f"Clearing index: {index_name}")
         indexes[index_name]._clear()
-    
+
     return {'message': 'Index cleared'}
 
 
@@ -284,6 +306,7 @@ async def retrieve_with_id(index_name: str, _id: str):
     retrieved_id = indexes[index_name]._get_doc_by_id(_id)
     return {'id': retrieved_id}
 
+
 @app.get("/remove_doc_from_index")
 async def remove_doc_from_index(index_name: str, _id: str, api_key: APIKey = Depends(get_api_key)):
     if index_name not in indexes:
@@ -291,21 +314,24 @@ async def remove_doc_from_index(index_name: str, _id: str, api_key: APIKey = Dep
     result = indexes[index_name]._delete_doc_from_index(_id)
     return result
 
+
 class ExplainerContext(BaseModel):
     index_name: str
     query: str
     documents: List[Document]
 
+
 @app.post("/explain_results")
 async def explain_results(context: ExplainerContext):
-                # Try to explain results
+    # Try to explain results
     explainer = SimilarityExplainer(search_index=indexes[context.index_name])
     for result in context.documents:
-        importance_scores = explainer.explain_similarity(context.query, result.page_content)
+        importance_scores = explainer.explain_similarity(
+            context.query, result.page_content)
         result.metadata['relevant_words'] = importance_scores
-            
+
     return context.documents
-    
+
 # Edit this to add the chain you want to add
 # add_routes(app, call_graph, path="/data")
 
