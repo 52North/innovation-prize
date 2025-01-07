@@ -7,6 +7,12 @@ class Config:
         self.config_file = os.path.expanduser(config_file) if config_file else os.getenv('CONFIG_FILE')
 
         self.load_config_file()
+        
+        # optional overrides from env
+        self.openai_api_key = os.getenv("OPENAI_API_KEY", self.openai_api_key)
+        self.tavily_api_key = os.getenv("TAVILY_API_KEY", self.tavily_api_key)
+        self.groq_api_key = os.getenv("GROQ_API_KEY", self.groq_api_key)
+        
         """
         ### Add entries like: 
         ### ...
