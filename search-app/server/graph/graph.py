@@ -3,9 +3,8 @@ from langchain_core.messages import BaseMessage
 from langgraph.graph import END, StateGraph
 import operator
 from langchain_core.messages import AIMessage, HumanMessage
-#from langchain_community.tools.tavily_search import TavilySearchResults
-from langchain_community.tools import TavilySearchResults
-#from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
+from langchain_community.tools import DuckDuckGoSearchResults
+# from langchain_community.tools import TavilySearchResults
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 import json
 from datetime import datetime
@@ -226,8 +225,10 @@ class SpatialRetrieverGraph(StateGraph):
                                                         "search_type": "similarity",
                                                         "k": 20})
         else:  # web search
-            tavily_search = TavilySearchResults()
-            search_results = await tavily_search.ainvoke(state["search_criteria"])
+            # tavily_search = TavilySearchResults()
+            # search_results = await tavily_search.ainvoke(state["search_criteria"])
+            # ddgs_search = DuckDuckGoSearchResults()
+            # search_results = await ddgs_search.ainvoke(state["search_criteria"])
 
         state["search_results"] = search_results
 
