@@ -227,8 +227,8 @@ class SpatialRetrieverGraph(StateGraph):
         else:  # web search
             # tavily_search = TavilySearchResults()
             # search_results = await tavily_search.ainvoke(state["search_criteria"])
-            # ddgs_search = DuckDuckGoSearchResults()
-            # search_results = await ddgs_search.ainvoke(state["search_criteria"])
+            ddgs_search = DuckDuckGoSearchResults()
+            search_results = await ddgs_search.ainvoke(state["search_criteria"])
 
         state["search_results"] = search_results
 
