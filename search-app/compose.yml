@@ -1,0 +1,21 @@
+
+services:
+  search_app:
+    image: 52north/ip-sdsa-app:latest
+    build:
+      dockerfile: ./Dockerfile
+      context: ./server
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+    ports:
+      - 8000:8080
+    #command: sleep infinity
+  
+  demo_client:
+    image: 52north/ip-sdsa-client:latest
+    build:
+      dockerfile: ./Dockerfile
+      context: ./client/demo_client
+    ports:
+      - 80:8080

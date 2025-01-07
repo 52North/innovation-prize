@@ -31,14 +31,6 @@ logging.getLogger().setLevel(logging.INFO)
 
 config = Config('./config/config.json')
 
-OPENAI_API_KEY = config.openai_api_key
-TAVILY_API_KEY = config.tavily_api_key
-GROQ_API_KEY = config.groq_api_key
-
-os.environ['GROQ_API_KEY'] = GROQ_API_KEY
-os.environ['OPENAI_API_KEY'] = OPENAI_API_KEY
-os.environ['TAVILY_API_KEY'] = TAVILY_API_KEY
-
 
 llm = ChatGroq(
     model="llama3-70b-8192",
@@ -53,8 +45,8 @@ llm = ChatGroq(
 # llm_with_structured_output = ChatOpenAI(model="gpt-3.5-turbo-0125",
 #                  model_kwargs={ "response_format": { "type": "json_object" } })
 
-llm_unstructured, final_answer_llm = OpenAI(temperature=0, openai_api_key=OPENAI_API_KEY),  OpenAI(temperature=0, openai_api_key=OPENAI_API_KEY)
-
+llm_unstructured = OpenAI(temperature=0, openai_api_key=config.openai_api_key)
+final_answer_llm = OpenAI(temperature=0, openai_api_key=config.openai_api_key)
 
 def is_valid_json(myjson):
     try:

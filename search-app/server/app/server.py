@@ -12,7 +12,7 @@ from langchain.schema import Document
 from langchain_core.messages import HumanMessage, AIMessage
 
 from fastapi.middleware.cors import CORSMiddleware
-from .utils import (SessionData, cookie, verifier, backend,
+from app.utils import (SessionData, cookie, verifier, backend,
                     calculate_bounding_box, summarize_feature_collection_properties,
                     load_conversational_prompts)
 
@@ -39,7 +39,8 @@ logging.getLogger().setLevel(logging.INFO)
 
 # Define the origins that should be allowed to make requests to your API
 origins = [
-    "http://localhost:5173",  # Frontend app origin
+    "http://localhost",
+    "http://localhost:*",
 ]
 
 # Init memory:
