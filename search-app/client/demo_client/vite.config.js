@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
+import EnvironmentPlugin from 'vite-plugin-environment'
 
 export default defineConfig({
   resolve: {
@@ -7,5 +8,5 @@ export default defineConfig({
       vue: '@vue/compat',
     },
   },
-  plugins: [vue()],
+  plugins: [vue(), EnvironmentPlugin(['VUE_APP_BACKEND_API_URL']),],
 });

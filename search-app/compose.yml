@@ -18,5 +18,7 @@ services:
     build:
       dockerfile: ./Dockerfile
       context: ./client/demo_client
+    environment:
+      - VUE_APP_BACKEND_API_URL=${VUE_APP_BACKEND_API_URL:-http://localhost:8000}
     ports:
       - 80:8080

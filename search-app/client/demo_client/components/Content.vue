@@ -89,6 +89,7 @@
 <script>
 import axios from 'axios';
 import Map from './Map.vue';
+import BACKEND_API_URL from '../config.js';
 import VueJsonPretty from 'vue-json-pretty';
 import 'vue-json-pretty/lib/styles.css';
 import { marked } from 'marked';
@@ -139,7 +140,7 @@ export default {
       try {
         
         console.log(this.userInput);
-        const response = await axios.post('http://localhost:8000/data', { query: this.userInput }, {
+        const response = await axios.post(`${BACKEND_API_URL}/data`, { query: this.userInput }, {
           withCredentials: true
         });
 

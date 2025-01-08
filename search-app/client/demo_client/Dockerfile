@@ -1,5 +1,7 @@
 FROM node:lts-alpine
 
+ENV VUE_APP_BACKEND_API_URL=http://localhost:8000
+
 # install simple http server for serving static content
 RUN npm install -g http-server
 
