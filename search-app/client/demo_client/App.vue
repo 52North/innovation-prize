@@ -21,7 +21,7 @@ import Sidebar from "./components/Sidebar.vue";
 import Content from "./components/Content.vue";
 import axios from 'axios';
 import Cookies from 'js-cookie';
-import BACKEND_API_URL from './config';
+import config from './config';
 
 export default {
 	components: {
@@ -40,7 +40,7 @@ export default {
 			if (!sessionCookie) {
 
 				try {
-					const response = await axios.post(`${BACKEND_API_URL}/create_session`, {}, {
+					const response = await axios.post(`${config.BACKEND_API_URL}/create_session`, {}, {
 						withCredentials: true // This is important for cross-origin requests with credentials
 					});
 					console.log("Registered with ", response.data);

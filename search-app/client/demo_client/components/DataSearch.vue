@@ -20,7 +20,7 @@
 </template>
 
 <script>
-import BACKEND_API_URL from '../config.js';
+import config from '../config';
 import axios from 'axios';
 
 export default {
@@ -34,7 +34,7 @@ export default {
     async searchMetadata() {
       if (this.searchQuery.trim() !== '') {
         try {
-          const response = await axios.post(`${BACKEND_API_URL}/retrieve_pygeoapi/invoke`, {
+          const response = await axios.post(`${config.BACKEND_API_URL}/retrieve_pygeoapi/invoke`, {
             input: this.searchQuery
           });
 
