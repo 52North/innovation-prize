@@ -213,7 +213,7 @@ class SpatialRetrieverGraph(StateGraph):
         logging.info(f"Search criteria used: {state['search_criteria']}")
         index_name = state.get("index_name", "")
 
-        if index_name in search_index:
+        if index_name in self.search_indexes:
             search_index = self.search_indexes[index_name]
             search_tool = self.search_tools[index_name]
         
