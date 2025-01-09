@@ -11,6 +11,8 @@ services:
       - GROQ_API_KEY=${GROQ_API_KEY}
       - TAVILY_API_KEY=${TAVILY_API_KEY}
       - ROOT_PATH=${API_ROOT_PATH:-/}
+    volumes:
+      - indexes:/app/chroma_db
     ports:
       - 8000:8080
     #command: sleep infinity
@@ -25,3 +27,9 @@ services:
         - VUE_APP_BACKEND_API_URL=${VUE_APP_BACKEND_API_URL:-http://localhost:8000}
     ports:
       - 80:8080
+
+volumes:
+  indexes:
+
+networks:
+  default:
