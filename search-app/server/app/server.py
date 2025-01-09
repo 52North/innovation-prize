@@ -241,7 +241,7 @@ async def index_geojson_osm(api_key: APIKey = Depends(get_api_key)):
     logging.info(f"Converted {len(feature_docs)} Features or FeatureGroups to documents")
     res_local = indexes['geojson']._index(documents=feature_docs)
 
-    if (res_local["num_added"] > 20) or (res_local["updated"] > 20):
+    if (res_local["num_added"] > 20) or (res_local["num_updated"] > 20):
         collection_router.setup()
         load_conversational_prompts(collection_router=collection_router)
 
