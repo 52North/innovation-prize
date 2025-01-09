@@ -5,6 +5,7 @@ services:
     build:
       dockerfile: ./Dockerfile
       context: ./server
+    restart: always
     environment:
       - SDSA_API_KEY=${SDSA_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -25,6 +26,7 @@ services:
       args:
         - CLIENT_BASE_PATH=${CLIENT_BASE_PATH:-/}
         - VUE_APP_BACKEND_API_URL=${VUE_APP_BACKEND_API_URL:-http://localhost:8000}
+    restart: always
     ports:
       - 80:8080
 
