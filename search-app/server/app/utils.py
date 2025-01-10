@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 from loguru import logger
 
+from config.config import resolve_abs_path
 
 
 class SessionData(BaseModel):
@@ -142,7 +143,8 @@ def write_dict_to_file(dictionary, filename):
         file.write(f"prompts = {repr(dictionary)}\n")
 
 def load_conversational_prompts(collection_router):
-    loaded_dict = read_dict_from_module('./graph/custom_prompts/custom_prompts.py')
+    custom_prompts_path = resolve_abs_path('./graph/custom_prompts/custom_prompts.py')
+    loaded_dict = read_dict_from_module(custom_prompts_path)
     if not collection_router.coll_dicts:
         logger.info("No collections in vector store. Not generating individual prompts")
         return {}
@@ -154,7 +156,7 @@ def load_conversational_prompts(collection_router):
         conversational_prompts = loaded_dict
     else:   
         conversational_prompts = collection_router.generate_conversation_prompts()
-        write_dict_to_file(conversational_prompts,'./graph/custom_prompts/custom_prompts.py')
+        write_dict_to_file(conversational_prompts, custom_prompts_path)
     
     return conversational_prompts
 

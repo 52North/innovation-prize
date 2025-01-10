@@ -5,11 +5,14 @@ from loguru import logger
 
 package_dir = Path(__file__).parent.parent.resolve()
 
+def resolve_abs_path(path: str):
+    return str(package_dir.joinpath(path))
+
 class Config:
     """Config file"""
     def __init__(self) -> None:
-        default_config_path = os.path.join(package_dir, "config", "config.json")
-        default_chroma_dir = os.path.join(package_dir, "server", "chroma_db")
+        default_config_path = resolve_abs_path("./config/config.json")
+        default_chroma_dir = resolve_abs_path("./server/chroma_db")
 
         # set config from env
         self.config_file = os.getenv('CONFIG_FILE', default_config_path)
