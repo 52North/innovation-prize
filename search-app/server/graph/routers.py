@@ -9,20 +9,15 @@ import re
 from semantic_router import Route
 from semantic_router.layer import RouteLayer
 from semantic_router.encoders import OpenAIEncoder
-import logging
+from loguru import logger
 
-logging.basicConfig()
-logging.getLogger().setLevel(logging.INFO)
+from config.config import CONFIG
 
-
-
-config = Config('./config/config.json')
-
-OPENAI_API_KEY = config.openai_api_key
+OPENAI_API_KEY = CONFIG.openai_api_key
 
 class CollectionRouter():
-    def __init__(self, persist_dir: str="../server/chroma_db"):
-        self.persist_dir = persist_dir
+    def __init__(self):
+        self.persist_dir = CONFIG.chroma_dir
         self.llm = ChatOpenAI(model="gpt-4o-mini")
         self.encoder = OpenAIEncoder()
         self.setup()
@@ -44,12 +39,12 @@ class CollectionRouter():
 
         coll_dicts = []
         for c in collections:
-                logging.info(f"Looking into collection {c.name}")
+                logger.info(f"Looking into collection {c.name}")
                 if c.name != "langchain":
                     coll = client.get_collection(c.name)
                     number_docs = coll.count()
                     if number_docs == 0:
-                        logging.info(f"Collection {c.name} has no indexed records")
+                        logger.info(f"Collection {c.name} has no indexed records")
                         continue                    
                     top_10_docs = coll.peek()
                     sample_docs = top_10_docs["documents"]
@@ -145,6 +140,6 @@ class CollectionRouter():
             | StrOutputParser()
         )
         
-        logging.info("Generating individual prompts for all collections")
+        logger.info("Generating individual prompts for all collections")
         prompts = {c['collection_name']: chain.invoke({"collection": c}) for c in self.coll_dicts if c['number_docs'] > 0}
         return prompts

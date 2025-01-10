@@ -10,5 +10,3 @@ search-app/server/chroma_db/chroma.sqlite3
 *.log
 *.zip
 *.tar.gz
-
-record_manager_cache.sql

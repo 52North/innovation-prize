@@ -3,18 +3,15 @@ from langchain_community.embeddings import GPT4AllEmbeddings
 from langchain.indexes import SQLRecordManager, index
 from typing import List
 from langchain_core.documents import Document
-import logging 
+from loguru import logger
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
-logging.basicConfig()
-logging.getLogger().setLevel(logging.INFO)
-
+from config.config import CONFIG
 
 class Indexer():
     def __init__(
             self,
             index_name: str,
-            persist_directory: str = './chroma_db',
             embedding_model: str = "nomic-embed-text-v1.5.f16.gguf",
             use_hf_model: bool = False,
             k: int = 3,
@@ -38,7 +35,7 @@ class Indexer():
         else:
             self.embedding_function = GPT4AllEmbeddings(model_name=embedding_model)
 
-        self.vectorstore = Chroma(persist_directory=persist_directory,
+        self.vectorstore = Chroma(persist_directory=CONFIG.chroma_dir,
                                   embedding_function=self.embedding_function,
                                   collection_name=index_name)
         
@@ -63,7 +60,7 @@ class Indexer():
                documents: List[Document],
                cleanup=None,
                source_id_key: str="url"):
-        logging.info(f"Indexing recieved documents - using {self.embedding_model} as embedding model")
+        logger.info(f"Indexing recieved documents - using {self.embedding_model} as embedding model")
         return index(
             documents,  
             self.record_manager,

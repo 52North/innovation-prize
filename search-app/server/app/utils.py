@@ -9,11 +9,8 @@ import importlib
 import json
 import sys
 from pathlib import Path
-import logging
+from loguru import logger
 
-
-logging.basicConfig()
-logging.getLogger().setLevel(logging.INFO)
 
 
 class SessionData(BaseModel):
@@ -137,7 +134,7 @@ def read_dict_from_module(module_path):
         except ImportError:
             return None
     else:
-        logging.info(f"Module '{module_name}.py' does not exist.")
+        logger.info(f"Module '{module_name}.py' does not exist.")
         return None
 
 def write_dict_to_file(dictionary, filename):
@@ -147,13 +144,13 @@ def write_dict_to_file(dictionary, filename):
 def load_conversational_prompts(collection_router):
     loaded_dict = read_dict_from_module('./graph/custom_prompts/custom_prompts.py')
     if not collection_router.coll_dicts:
-        logging.info("No collections in vector store. Not generating individual prompts")
+        logger.info("No collections in vector store. Not generating individual prompts")
         return {}
 
     collection_names = [c['collection_name'] for c in collection_router.coll_dicts]
 
     if loaded_dict and set(loaded_dict.keys()) == set(collection_names):
-        logging.info("Custom prompts already generated for current collections. Reading it from file...")
+        logger.info("Custom prompts already generated for current collections. Reading it from file...")
         conversational_prompts = loaded_dict
     else:   
         conversational_prompts = collection_router.generate_conversation_prompts()

@@ -1,4 +1,4 @@
-import logging
+from loguru import logger
 from config.config import Config
 import geojson
 from typing import List, Dict
@@ -12,10 +12,7 @@ from tqdm.asyncio import tqdm
 import json
 import re 
 
-logging.basicConfig()
-logging.getLogger().setLevel(logging.INFO)
-
-config = Config('./config/config.json')
+from config.config import CONFIG, package_dir
 
 def is_url(string):
     # Regex pattern for matching URLs
@@ -63,7 +60,7 @@ class GeoJSON():
         self.file_dir = file_dir   
         if self.file_dir and is_url(self.file_dir):
             """We assume the online resource to be a collection published via a PyGeoAPI instance"""
-            logging.info("Fetching GeoJSON features from online resource. This may take a few minutes.")
+            logger.info("Fetching GeoJSON features from online resource. This may take a few minutes.")
             params = {"f": "json", "limit": 10000}
             gj = self._fetch_features_from_online_resource(params)
             print(f"Retrieved {len(gj)} features")
@@ -74,11 +71,11 @@ class GeoJSON():
                 self.features = gj
         else:
             if not self.file_dir:
-                self.file_dir = config.local_geojson_files[0]
-            logging.info(f"Looking for files in following dir: {self.file_dir}")
+                self.file_dir = str(package_dir.joinpath(CONFIG.local_geojson_files[0]))
+            logger.info(f"Looking for files in following dir: {self.file_dir}")
             gj_files = []
-            for file in glob.glob(f"{self.file_dir}*.geojson"):
-                logging.info(f"Extracting features from file: {file}")
+            for file in glob.glob(f"{self.file_dir}/*.geojson"):
+                logger.info(f"Extracting features from file: {file}")
                 with open(file) as f:
                     gj = geojson.load(f)
                     gj_files.extend(gj['features'])
@@ -86,7 +83,7 @@ class GeoJSON():
 
             self.features = self._filter_meaningful_features(gj_files, tag_name)
 
-        logging.info(f"Recieved {len(self.features)} features")
+        logger.info(f"Recieved {len(self.features)} features")
         self.tag_name = tag_name
 
     def _fetch_features_from_online_resource(self, url, params):
@@ -143,7 +140,7 @@ class GeoJSON():
         return dict(zip(tasks.keys(), descriptions))
 
     async def add_descriptions_to_features(self) -> None:
-        logging.info(f"Fetching descriptions for {len(self.features)} OSM features")
+        logger.info(f"Fetching descriptions for {len(self.features)} OSM features")
         tag_description_map = await self._get_descriptions_for_tags()
         
         for feature in self.features:

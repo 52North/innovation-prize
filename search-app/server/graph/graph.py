@@ -18,15 +18,12 @@ from .actions import (
 import asyncio
 from contextlib import asynccontextmanager
 from .spatial_utilities import check_within_bbox
-import logging
+from loguru import logger
 import ast
 from functools import lru_cache
 from typing import Type
 from uuid import UUID, uuid4
 
-
-logging.basicConfig()
-logging.getLogger().setLevel(logging.INFO)
 
 
 def is_valid_json(myjson):
@@ -125,7 +122,7 @@ class SpatialRetrieverGraph(StateGraph):
             
             chat_history.append(HumanMessage(content=state["messages"][-1].content))
             
-            logging.info(f"Messages after loading history: {chat_history}")
+            logger.info(f"Messages after loading history: {chat_history}")
         else:
             print("---start conversation (no previous messages)")
             chat_history = [HumanMessage(content=state["messages"][-1].content)]
@@ -145,11 +142,11 @@ class SpatialRetrieverGraph(StateGraph):
 
         prompt = None
         if route_choice.name:
-            logging.info(f"Chosen route: {route_choice.name}")
+            logger.info(f"Chosen route: {route_choice.name}")
             state["index_name"] = route_choice.name
             prompt = self.conversational_prompts[route_choice.name]
         else:
-            logging.info("No route chosen, routing to default")
+            logger.info("No route chosen, routing to default")
 
         response = run_converstation_chain(input=state["messages"][-1].content,
                                            chat_history=chat_history,
@@ -161,8 +158,8 @@ class SpatialRetrieverGraph(StateGraph):
 
         state["messages"].append(AIMessage(content=response.get("answer")))
 
-        logging.info(f"Chat history: {chat_history}")
-        logging.info(f"State messages at the end: {state['messages']}")
+        logger.info(f"Chat history: {chat_history}")
+        logger.info(f"State messages at the end: {state['messages']}")
 
         state["messages"] = chat_history
 
@@ -186,7 +183,7 @@ class SpatialRetrieverGraph(StateGraph):
             spatial_context_str = await spatial_context_extraction_tool.ainvoke(
                 {"query": str(state['search_criteria'])})
 
-            logging.info(
+            logger.info(
                 f"Automatically derived spatial context: {spatial_context_str}")
 
             try:
@@ -204,20 +201,20 @@ class SpatialRetrieverGraph(StateGraph):
             # Todo: also try to derive temporal extent from inputs
             temporal_extent = ""
 
-        logging.info(
+        logger.info(
             f"Extracted following spatial context: {spatial_extent} and following temporal extent: {temporal_extent}")
         return state
 
     async def run_search(self, state: State):
         print("---running a search")
-        logging.info(f"Search criteria used: {state['search_criteria']}")
+        logger.info(f"Search criteria used: {state['search_criteria']}")
         index_name = state.get("index_name", "")
 
         if index_name in self.search_indexes:
             search_index = self.search_indexes[index_name]
             search_tool = self.search_tools[index_name]
         
-            logging.info(
+            logger.info(
                 f"Starting search in index: {index_name} using this tool: {search_tool.name}")
 
             search_results = await search_tool.ainvoke({"query": str(state['search_criteria']),
@@ -262,7 +259,7 @@ class SpatialRetrieverGraph(StateGraph):
                     )
             
                     search_results = all_results[:5]
-                    logging.info(
+                    logger.info(
                         f"Found: {len(search_results)} using query-bbox {query_bbox}")
                     doc_contents = "\n\n".join(
                         doc.page_content for doc in search_results)
@@ -271,7 +268,7 @@ class SpatialRetrieverGraph(StateGraph):
                 else:
                     search_results = state["search_results"][:10]
 
-                    logging.info(f"search results: {search_results}")
+                    logger.info(f"search results: {search_results}")
                     doc_contents = "\n\n".join(
                         doc.page_content for doc in search_results)
                     
@@ -282,12 +279,12 @@ class SpatialRetrieverGraph(StateGraph):
                     state['search_results'] = []
 
                 query = state["search_criteria"]
-                logging.info(f"Context for rag: {context}")
+                logger.info(f"Context for rag: {context}")
                 answer = await final_answer_chain.ainvoke({"query": query, "context": context})
                 answer = answer.strip()
 
             except Exception as e:
-                logging.error(f"Error in final_answer: {str(e)}")
+                logger.error(f"Error in final_answer: {str(e)}", e)
                 answer = "Sorry, I encountered an error processing your request. Please try again."
 
             state["messages"].append(AIMessage(content=answer))

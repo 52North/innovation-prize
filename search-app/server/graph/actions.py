@@ -17,19 +17,14 @@ from langchain.tools import tool
 from pydantic import BaseModel, Field
 from typing import Literal
 import requests
-import logging
+from loguru import logger
 from semantic_router import Route
 from semantic_router.encoders import OpenAIEncoder
 from semantic_router.layer import RouteLayer
 import os
 from langchain_groq import ChatGroq
 
-
-logging.basicConfig()
-logging.getLogger().setLevel(logging.INFO)
-
-
-config = Config('./config/config.json')
+from config.config import CONFIG
 
 
 llm = ChatGroq(
@@ -45,8 +40,8 @@ llm = ChatGroq(
 # llm_with_structured_output = ChatOpenAI(model="gpt-3.5-turbo-0125",
 #                  model_kwargs={ "response_format": { "type": "json_object" } })
 
-llm_unstructured = OpenAI(temperature=0, openai_api_key=config.openai_api_key)
-final_answer_llm = OpenAI(temperature=0, openai_api_key=config.openai_api_key)
+llm_unstructured = OpenAI(temperature=0, openai_api_key=CONFIG.openai_api_key)
+final_answer_llm = OpenAI(temperature=0, openai_api_key=CONFIG.openai_api_key)
 
 def is_valid_json(myjson):
     try:
@@ -102,7 +97,7 @@ def run_converstation_chain(input: str, chat_history, prompt=None):
         #| output_parser
     ) 
 
-    logging.info(f"input to converation chain: {input}")
+    logger.info(f"input to converation chain: {input}")
 
     history =  conversation_chain.invoke(
         {"input": input,

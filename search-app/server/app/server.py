@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from langserve import add_routes
 from graph.graph import SpatialRetrieverGraph, State
 from graph.routers import CollectionRouter
@@ -21,7 +21,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 
 
-from fastapi import HTTPException, FastAPI, Depends, Response, Security
+from fastapi import HTTPException, FastAPI, Depends, Request, Response, Security
 from fastapi.security.api_key import APIKeyHeader, APIKey
 # from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
 from uuid import UUID, uuid4
@@ -29,12 +29,11 @@ from typing import List
 import geojson
 from pydantic import BaseModel
 import json
-import logging
+from loguru import logger
 from typing import Optional, Dict, Any
 
+from config.config import CONFIG
 
-logging.basicConfig()
-logging.getLogger().setLevel(logging.INFO)
 
 
 # Define the origins that should be allowed to make requests to your API
@@ -53,10 +52,8 @@ memory = AsyncSqliteSaver.from_conn_string(memory_path)
 async def get_current_session(session_id: UUID = Depends(cookie), session_data: SessionData = Depends(verifier)):
     return session_data
 
-config = Config('./config/config.json')
-
 # Authentificate
-API_KEY = config.sdsa_api_key  # Replace with your actual API key
+API_KEY = CONFIG.sdsa_api_key  # Replace with your actual API key
 API_KEY_NAME = "X-API-Key"
 
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
@@ -114,6 +111,16 @@ async def get_api_key(api_key_header: str = Security(api_key_header)):
     if api_key_header == API_KEY:
         return api_key_header
     raise HTTPException(status_code=403, detail="Could not validate API Key")
+
+
+
+@app.exception_handler(Exception)
+async def unicorn_exception_handler(request: Request, exc: Exception):
+    logger.error(exc)
+    return JSONResponse(
+        status_code=500,
+        content={"message": f"Oops! {exc.name} did something. There goes a rainbow..."},
+    )
 
 
 @app.get("/")
@@ -216,11 +223,11 @@ async def fetch_documents(indexing: bool = True, api_key: APIKey = Depends(get_a
     # Scrape from pygeoapi resources
     pygeoapi = PyGeoAPI()
     pygeoapi_docs = await pygeoapi.get_docs_for_all_instances()
-    logging.info(f"Retrieved {len(pygeoapi_docs)} documents from pygeoapi")
+    logger.info(f"Retrieved {len(pygeoapi_docs)} documents from pygeoapi")
 
     if indexing:
         # Indexing received docs
-        logging.info("Indexing fetched documents in pygeoapi index")
+        logger.info("Indexing fetched documents in pygeoapi index")
         res_pygeoapi = indexes["pygeoapi"]._index(documents=pygeoapi_docs)
 
         # In case the collection changes significantly, also update the custom prompts
@@ -238,7 +245,7 @@ async def fetch_documents(indexing: bool = True, api_key: APIKey = Depends(get_a
 async def index_geojson_osm(api_key: APIKey = Depends(get_api_key)):
     # await local_file_connector.add_descriptions_to_features()
     feature_docs = await geojson_osm_connector._features_to_docs()
-    logging.info(f"Converted {len(feature_docs)} Features or FeatureGroups to documents")
+    logger.info(f"Converted {len(feature_docs)} Features or FeatureGroups to documents")
     res_local = indexes['geojson']._index(documents=feature_docs)
 
     if (res_local["num_added"] > 20) or (res_local["num_updated"] > 20):
@@ -291,10 +298,10 @@ async def clear_index(index_name: str, api_key: APIKey = Depends(get_api_key)):
         raise HTTPException(status_code=400, detail="Invalid index name")
 
     if index_name == 'geojson':
-        logging.info("Clearing geojson index")
+        logger.info("Clearing geojson index")
         indexes['geojson']._clear()
     else:
-        logging.info(f"Clearing index: {index_name}")
+        logger.info(f"Clearing index: {index_name}")
         indexes[index_name]._clear()
 
     return {'message': 'Index cleared'}

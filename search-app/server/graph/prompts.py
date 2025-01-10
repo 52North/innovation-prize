@@ -1,14 +1,11 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.prompts import PromptTemplate
-import logging
-
-logging.basicConfig()
-logging.getLogger().setLevel(logging.INFO)
+from loguru import logger
 
 
 def generate_conversation_prompt(format_instructions, system_prompt=None):
     if not system_prompt:
-        logging.info("Using default system prompt")
+        logger.info("Using default system prompt")
         system_prompt =  """
         **AI Instructions:**
             You are an AI designed to assist users in finding environmental or geospatial datasets. Follow these guidelines: 
@@ -72,7 +69,7 @@ def generate_conversation_prompt(format_instructions, system_prompt=None):
         **Generating Search Query:** "high resolution land use data North America 2010-2020"
         """
     else:
-        logging.info("Using custom system prompt")
+        logger.info("Using custom system prompt")
 
     # It appears that its necessary to have the prompt formated as it would be with triple-quotes
     system_prompt = system_prompt.replace("\\n", "\n").replace("\\'", "'")

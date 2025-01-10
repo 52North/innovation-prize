@@ -1,18 +1,30 @@
 import json
 import os
+from pathlib import Path
+from loguru import logger
+
+package_dir = Path(__file__).parent.parent.resolve()
 
 class Config:
     """Config file"""
-    def __init__(self, config_file: str = None) -> None:
-        self.config_file = os.path.expanduser(config_file) if config_file else os.getenv('CONFIG_FILE')
+    def __init__(self) -> None:
+        default_config_path = os.path.join(package_dir, "config", "config.json")
+        default_chroma_dir = os.path.join(package_dir, "server", "chroma_db")
 
+        # set config from env
+        self.config_file = os.getenv('CONFIG_FILE', default_config_path)
+        self.chroma_dir = os.getenv("CHROMA_DIR", default_chroma_dir)
+        logger.info(f"Read config from '{self.config_file}'")
+        logger.info(f"Use chroma dir '{self.chroma_dir}'")
+        
         self.load_config_file()
         
-        # optional overrides from env
+        # optional API KEY overrides from env
         self.sdsa_api_key = os.getenv("SDSA_API_KEY", self.sdsa_api_key)
         self.openai_api_key = os.getenv("OPENAI_API_KEY", self.openai_api_key)
         self.tavily_api_key = os.getenv("TAVILY_API_KEY", self.tavily_api_key)
         self.groq_api_key = os.getenv("GROQ_API_KEY", self.groq_api_key)
+        
         
         """
         ### Add entries like: 
@@ -59,3 +71,5 @@ class Config:
             config = json.load(f)
         for key, value in config.items():
             setattr(self, key.lower(), value)
+
+CONFIG = Config()
