@@ -46,7 +46,7 @@ final_answer_llm = OpenAI(temperature=0, openai_api_key=CONFIG.openai_api_key)
 def is_valid_json(myjson):
     try:
         json_object = json.loads(myjson)
-    except ValueError as e:
+    except ValueError:
         return False
     return True
 

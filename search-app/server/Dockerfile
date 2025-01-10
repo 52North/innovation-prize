@@ -2,6 +2,7 @@ FROM python:3.11-slim
 
 ARG ROOT_PATH="/"
 ENV LOGURU_LEVEL="INFO"
+ENV WORKER=4
 
 RUN pip install poetry==1.6.1
 
@@ -21,4 +22,4 @@ RUN poetry install --no-interaction --no-ansi
 
 EXPOSE 8080
 
-CMD exec uvicorn app.server:app --workers 10 --host 0.0.0.0 --port 8080 --root-path $ROOT_PATH
+CMD exec uvicorn app.server:app --workers $WORKER --host 0.0.0.0 --port 8080 --root-path $ROOT_PATH

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from contextlib import asynccontextmanager
 from fastapi.responses import RedirectResponse, JSONResponse
 from langserve import add_routes
 from graph.graph import SpatialRetrieverGraph, State
@@ -61,19 +62,6 @@ api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 state_session_to_graph = {}
 
 
-# Create a dictionary of indexes
-indexes = {
-    "pygeoapi": Indexer(index_name="pygeoapi",
-                        score_treshold=0.4,
-                        k=20),
-    "geojson": Indexer(index_name="geojson",  # Add indexer for local geojson with OSM features
-                       score_treshold=0.4,
-                       k=20,
-                       # use_hf_model=True,
-                       # embedding_model="Alibaba-NLP/gte-large-en-v1.5"
-                       )
-}
-
 # Add connection to local file including building features
 # Replace the value for tag_name argument if you have other data
 
@@ -92,7 +80,29 @@ conversational_prompts = load_conversational_prompts(
     collection_router=collection_router)
 
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    indexes = {
+        "pygeoapi": Indexer(index_name="pygeoapi",
+                            score_treshold=0.4,
+                            k=20),
+        "geojson": Indexer(index_name="geojson",  # Add indexer for local geojson with OSM features
+                        score_treshold=0.4,
+                        k=20,
+                        # use_hf_model=True,
+                        # embedding_model="Alibaba-NLP/gte-large-en-v1.5"
+                        )
+    }
+    
+    for index_name, index_instance in indexes.items():
+        add_routes(app, index_instance.retriever, path=f"/retrieve_{index_name}")
+    app.state.indexes = indexes
+    
+    yield
+    
+    del indexes
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -125,7 +135,7 @@ async def redirect_root_to_docs():
     return RedirectResponse("/docs")
 
 
-async def _create_session(response: Response):
+async def _create_session(request: Request, response: Response):
     session_id = str(uuid4())
 
     graph = SpatialRetrieverGraph(state=State(messages=[], 
@@ -137,7 +147,7 @@ async def _create_session(response: Response):
                                               ready_to_retrieve=""), 
                                               thread_id=session_id, 
                                               memory=memory,
-                                              search_indexes=indexes,
+                                              search_indexes=request.app.state.indexes,
                                               collection_router=collection_router,
                                               conversational_prompts=conversational_prompts
                                               ).compile()
@@ -150,8 +160,8 @@ async def _create_session(response: Response):
     return session_id
 
 @app.post("/create_session")
-async def create_session(response: Response):
-    session = await _create_session(response)
+async def create_session(request: Request, response: Response):
+    session = await _create_session(request, response)
     return {"message": f"new created session: {session}"}
 
 
@@ -164,12 +174,12 @@ class Query(BaseModel):
 async def call_graph(request: Request, response: Response, query_data: Query):
     global state_session_to_graph
     if COOKIE_NAME not in request.cookies:
-        session = await _create_session(response=response)
+        session = await _create_session(request, response)
         logger.debug(f"new session created: {session}")
     else:
         session = request.cookies[COOKIE_NAME]
         if session not in state_session_to_graph:
-            session = await _create_session(response=response)
+            session = await _create_session(request, response)
             logger.debug(f"session exposed .. new session created: {session}")
 
     thread_id = session
@@ -209,7 +219,7 @@ async def call_graph(request: Request, response: Response, query_data: Query):
 
 
 @app.get("/fetch_documents")
-async def fetch_documents(indexing: bool = True, api_key: APIKey = Depends(get_api_key)):
+async def fetch_documents(request: Request, indexing: bool = True, api_key: APIKey = Depends(get_api_key)):
     docs_to_index = []
 
     # Scrape from pygeoapi resources
@@ -220,7 +230,7 @@ async def fetch_documents(indexing: bool = True, api_key: APIKey = Depends(get_a
     if indexing:
         # Indexing received docs
         logger.info("Indexing fetched documents in pygeoapi index")
-        res_pygeoapi = indexes["pygeoapi"]._index(documents=pygeoapi_docs)
+        res_pygeoapi = request.app.state.indexes["pygeoapi"]._index(documents=pygeoapi_docs)
 
         # In case the collection changes significantly, also update the custom prompts
         if (res_pygeoapi["num_added"] > 20) or (res_pygeoapi["updated"] > 20):
@@ -234,11 +244,11 @@ async def fetch_documents(indexing: bool = True, api_key: APIKey = Depends(get_a
 
 
 @app.get("/index_geojson_osm_features")
-async def index_geojson_osm(api_key: APIKey = Depends(get_api_key)):
+async def index_geojson_osm(request: Request, api_key: APIKey = Depends(get_api_key)):
     # await local_file_connector.add_descriptions_to_features()
     feature_docs = await geojson_osm_connector._features_to_docs()
     logger.info(f"Converted {len(feature_docs)} Features or FeatureGroups to documents")
-    res_local = indexes['geojson']._index(documents=feature_docs)
+    res_local = request.app.state.indexes['geojson']._index(documents=feature_docs)
 
     if (res_local["num_added"] > 20) or (res_local["num_updated"] > 20):
         collection_router.setup()
@@ -285,7 +295,8 @@ async def retrieve_geojson(query: str):
 
 
 @app.get("/clear_index")
-async def clear_index(index_name: str, api_key: APIKey = Depends(get_api_key)):
+async def clear_index(request: Request, index_name: str, api_key: APIKey = Depends(get_api_key)):
+    indexes = request.app.state.indexes
     if index_name not in indexes and index_name != 'geojson':
         raise HTTPException(status_code=400, detail="Invalid index name")
 
@@ -300,7 +311,8 @@ async def clear_index(index_name: str, api_key: APIKey = Depends(get_api_key)):
 
 
 @app.get("/retrieve_with_id")
-async def retrieve_with_id(index_name: str, _id: str):
+async def retrieve_with_id(request: Request, index_name: str, _id: str):
+    indexes = request.app.state.indexes
     if index_name not in indexes:
         raise HTTPException(status_code=400, detail="Invalid index name")
     retrieved_id = indexes[index_name]._get_doc_by_id(_id)
@@ -308,7 +320,8 @@ async def retrieve_with_id(index_name: str, _id: str):
 
 
 @app.get("/remove_doc_from_index")
-async def remove_doc_from_index(index_name: str, _id: str, api_key: APIKey = Depends(get_api_key)):
+async def remove_doc_from_index(request: Request, index_name: str, _id: str, api_key: APIKey = Depends(get_api_key)):
+    indexes = request.app.state.indexes
     if index_name not in indexes:
         raise HTTPException(status_code=400, detail="Invalid index name")
     result = indexes[index_name]._delete_doc_from_index(_id)
@@ -322,8 +335,8 @@ class ExplainerContext(BaseModel):
 
 
 @app.post("/explain_results")
-async def explain_results(context: ExplainerContext):
-    # Try to explain results
+async def explain_results(request: Request, context: ExplainerContext):
+    indexes = request.app.state.indexes
     explainer = SimilarityExplainer(search_index=indexes[context.index_name])
     for result in context.documents:
         importance_scores = explainer.explain_similarity(
@@ -335,9 +348,7 @@ async def explain_results(context: ExplainerContext):
 # Edit this to add the chain you want to add
 #add_routes(app, call_graph, path="/data")
 
-for index_name, index_instance in indexes.items():
-    add_routes(app, index_instance.retriever, path=f"/retrieve_{index_name}")
-
 if __name__ == "__main__":
     import uvicorn
+    
     uvicorn.run(app, host="0.0.0.0", reload=False, port=8000)
