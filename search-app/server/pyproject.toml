@@ -39,6 +39,7 @@ semantic-router = "0.0.20"
 tqdm = "4.66.5"
 typing-extensions = "4.12.2"
 langgraph-checkpoint-sqlite = "^2.0.1"
+duckduckgo-search = "^7.2.1"
 
 [tool.poetry.extras]
 runtime = ["semantic-router"]
