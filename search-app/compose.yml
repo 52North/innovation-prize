@@ -5,8 +5,6 @@ services:
     build:
       dockerfile: ./Dockerfile
       context: ./server
-      args:
-        - ROOT_PATH=${API_ROOT_PATH:-/}
     restart: always
     environment:
       - SDSA_API_KEY=${SDSA_API_KEY}
@@ -15,6 +13,7 @@ services:
       - TAVILY_API_KEY=${TAVILY_API_KEY}
       - LOGURU_LEVEL=${LOGURU_LEVEL:-INFO}
       - WORKER=${GUNICORN_WORKER:-4}
+      - ROOT_PATH=${API_ROOT_PATH:-/}
     volumes:
       - indexes:/app/chroma_db
     ports:
