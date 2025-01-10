@@ -164,7 +164,7 @@ class Query(BaseModel):
 async def call_graph(request: Request, response: Response, query_data: Query):
     global state_session_to_graph
     if COOKIE_NAME not in request.cookies:
-        session = _create_session(response=response)
+        session = await _create_session(response=response)
         logger.debug(f"new session created: {session}")
     else:
         session = request.cookies[COOKIE_NAME]
