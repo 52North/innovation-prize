@@ -84,6 +84,7 @@ def read_dict_from_module(module_path):
             from graph.custom_prompts.custom_prompts import prompts  
             return prompts
         except ImportError:
+            logger.exception("Error importing custom prompts!")
             return None
     else:
         logger.info(f"Module '{module_name}.py' does not exist.")

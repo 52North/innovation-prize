@@ -17,8 +17,8 @@ class Config:
         # set config from env
         self.config_file = os.getenv('CONFIG_FILE', default_config_path)
         self.chroma_dir = os.getenv("CHROMA_DIR", default_chroma_dir)
-        logger.info(f"Read config from '{self.config_file}'")
-        logger.info(f"Use chroma dir '{self.chroma_dir}'")
+        logger.debug(f"Read config from '{self.config_file}'")
+        logger.debug(f"Use chroma dir '{self.chroma_dir}'")
         
         self.load_config_file()
         

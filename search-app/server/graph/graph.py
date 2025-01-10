@@ -187,13 +187,13 @@ class SpatialRetrieverGraph(StateGraph):
                 f"Automatically derived spatial context: {spatial_context_str}")
 
             try:
-                spatial_extent_dict = ast.literal_eval(
-                    spatial_context_str)
+                spatial_extent_dict = ast.literal_eval(spatial_context_str)
                 if spatial_extent_dict:
                     spatial_extent = spatial_extent_dict.get("extent", [])
                 else:
                     spatial_extent = []
-            except (ValueError, SyntaxError):
+            except (ValueError, SyntaxError) as e:
+                logger.debug(f"could not extract spatial context: {str(e)}")
                 spatial_extent = []
 
             state['spatio_temporal_context'] = spatial_extent
@@ -284,7 +284,7 @@ class SpatialRetrieverGraph(StateGraph):
                 answer = answer.strip()
 
             except Exception as e:
-                logger.error(f"Error in final_answer: {str(e)}", e)
+                logger.exception(f"Error in final_answer!")
                 answer = "Sorry, I encountered an error processing your request. Please try again."
 
             state["messages"].append(AIMessage(content=answer))
