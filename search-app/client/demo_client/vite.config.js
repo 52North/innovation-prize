@@ -8,5 +8,10 @@ export default defineConfig({
       vue: '@vue/compat',
     },
   },
-  plugins: [vue(), EnvironmentPlugin(['VUE_APP_BACKEND_API_URL']),],
+  plugins: [
+    vue(),
+    EnvironmentPlugin({
+      'VUE_APP_BACKEND_API_URL':"http://localhost:8000",
+    }),
+  ]
 });

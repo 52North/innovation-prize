@@ -12,9 +12,12 @@ from langchain.schema import Document
 from langchain_core.messages import HumanMessage, AIMessage
 
 from fastapi.middleware.cors import CORSMiddleware
-from app.utils import (SessionData, cookie, verifier, backend,
-                    calculate_bounding_box, summarize_feature_collection_properties,
-                    load_conversational_prompts)
+from app.utils import (
+    SessionData,
+    calculate_bounding_box,
+    summarize_feature_collection_properties,
+    load_conversational_prompts
+)
 
 # from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -35,22 +38,18 @@ from typing import Optional, Dict, Any
 from config.config import CONFIG
 
 
+COOKIE_NAME = "search_app-session"
 
 # Define the origins that should be allowed to make requests to your API
 origins = [
     "http://localhost",
-    "http://localhost:*",
+    "http://localhost:5173",
 ]
 
 # Init memory:
 memory_path = "checkpoint.db"
 memory = AsyncSqliteSaver.from_conn_string(memory_path)
 
-# Get session info via cookie
-
-
-async def get_current_session(session_id: UUID = Depends(cookie), session_data: SessionData = Depends(verifier)):
-    return session_data
 
 # Authentificate
 API_KEY = CONFIG.sdsa_api_key  # Replace with your actual API key
@@ -59,10 +58,7 @@ API_KEY_NAME = "X-API-Key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
 
-# Init graph-app
-# graph = SpatialRetrieverGraph(State(messages=[], search_criteria="", search_results=[], ready_to_retrieve="")).compile()
-graph = None
-session_id = None
+state_session_to_graph = {}
 
 
 # Create a dictionary of indexes
@@ -117,9 +113,10 @@ async def get_api_key(api_key_header: str = Security(api_key_header)):
 @app.exception_handler(Exception)
 async def unicorn_exception_handler(request: Request, exc: Exception):
     logger.error(exc)
+    message = str(exc)
     return JSONResponse(
         status_code=500,
-        content={"message": f"Oops! {exc.name} did something. There goes a rainbow..."},
+        content={"message": f"Oops! {message}"},
     )
 
 
@@ -127,31 +124,9 @@ async def unicorn_exception_handler(request: Request, exc: Exception):
 async def redirect_root_to_docs():
     return RedirectResponse("/docs")
 
-# Get session info via cookie
 
-
-async def get_current_session(session_id: UUID = Depends(cookie), session_data: SessionData = Depends(verifier)):
-    return session_data
-
-
-@app.get("/whoami", dependencies=[Depends(cookie)])
-async def whoami(session_data: SessionData = Depends(get_current_session)):
-    return session_data
-
-
-@app.post("/delete_session")
-async def del_session(response: Response, session_id: UUID = Depends(cookie)):
-    await backend.delete(session_id)
-    cookie.delete_from_response(response)
-    return "deleted session"
-
-
-@app.post("/create_session")
-async def create_session(response: Response):
-    session = uuid4()
-    session_id = str(session)
-
-    global graph
+async def _create_session(response: Response):
+    session_id = str(uuid4())
 
     graph = SpatialRetrieverGraph(state=State(messages=[], 
                                               search_criteria="", 
@@ -167,12 +142,17 @@ async def create_session(response: Response):
                                               conversational_prompts=conversational_prompts
                                               ).compile()
 
-    data = SessionData(session_id=session_id)
+    data = SessionData(session_id=session_id, graph=graph)
 
-    await backend.create(session, data)
-    cookie.attach_to_response(response, session)
+    global state_session_to_graph
+    state_session_to_graph.update({session_id: data})
+    response.set_cookie(key=COOKIE_NAME, value=session_id)
+    return session_id
 
-    return {"message": f"created session for {session}"}
+@app.post("/create_session")
+async def create_session(response: Response):
+    session = await _create_session(response)
+    return {"message": f"new created session: {session}"}
 
 
 class Query(BaseModel):
@@ -181,38 +161,49 @@ class Query(BaseModel):
 
 
 @app.post("/data")
-async def call_graph(query_data: Query, session_id: UUID = Depends(cookie)):
-    thread_id = str(session_id)
-    if graph is not None:
-        # Add an explicit reset command
-        if query_data.query == 'reset':
-            #if graph.memory.conn.is_alive():
-            if memory.conn.is_alive():
-                #async with graph.memory.conn.cursor() as cur:
-                async with memory.conn.cursor() as cur:
-                    # Check if checkpoints exist
-                    await cur.execute(f"SELECT * FROM checkpoints WHERE thread_id = '{thread_id}';")
-                    checkpoints = await cur.fetchall()
-                    if checkpoints:
-                        await cur.execute(f"DELETE FROM checkpoints WHERE thread_id = '{thread_id}' ;")
-                        return {"messages": [AIMessage(content="Okay, let's start a new search. What kind of data are you looking for?")]}
-
-                    else:
-                        return {"messages": "No previous chat history"}
-            else:
-                return {"messages": "No previous chat history"}
-
-        print(f"-#-#--Running graph---- Using session_id: {thread_id}")
-        inputs = {"messages": [HumanMessage(content=query_data.query)]}
-
-        if query_data.spatio_temporal_context:
-            inputs['spatio_temporal_context'] = query_data.spatio_temporal_context
-
-        # graph.graph.thread_id = thread_id
-        graph.thread_id = thread_id
-        response = await graph.ainvoke(inputs)
+async def call_graph(request: Request, response: Response, query_data: Query):
+    global state_session_to_graph
+    if COOKIE_NAME not in request.cookies:
+        session = _create_session(response=response)
+        logger.debug(f"new session created: {session}")
     else:
-        raise HTTPException(status_code=400, detail="No session created")
+        session = request.cookies[COOKIE_NAME]
+        if session not in state_session_to_graph:
+            raise HTTPException(status_code=400, detail="Invalid session!")
+
+    thread_id = session
+    session_data = state_session_to_graph[thread_id]
+    if not session_data or session_data.graph is None:
+        raise HTTPException(status_code=500, detail=f"No data found for session {session}!")
+    
+    # Add an explicit reset command
+    if query_data.query == 'reset':
+        #if graph.memory.conn.is_alive():
+        if memory.conn.is_alive():
+            #async with graph.memory.conn.cursor() as cur:
+            async with memory.conn.cursor() as cur:
+                # Check if checkpoints exist
+                await cur.execute(f"SELECT * FROM checkpoints WHERE thread_id = '{thread_id}';")
+                checkpoints = await cur.fetchall()
+                if checkpoints:
+                    await cur.execute(f"DELETE FROM checkpoints WHERE thread_id = '{thread_id}' ;")
+                    return {"messages": [AIMessage(content="Okay, let's start a new search. What kind of data are you looking for?")]}
+
+                else:
+                    return {"messages": "No previous chat history"}
+        else:
+            return {"messages": "No previous chat history"}
+
+    print(f"-#-#--Running graph---- Using session_id: {thread_id}")
+    inputs = {"messages": [HumanMessage(content=query_data.query)]}
+
+    if query_data.spatio_temporal_context:
+        inputs['spatio_temporal_context'] = query_data.spatio_temporal_context
+
+    graph = session_data.graph
+    graph.thread_id = thread_id
+    response = await graph.ainvoke(inputs)
+    
     return response
 
 
@@ -341,7 +332,7 @@ async def explain_results(context: ExplainerContext):
     return context.documents
 
 # Edit this to add the chain you want to add
-# add_routes(app, call_graph, path="/data")
+#add_routes(app, call_graph, path="/data")
 
 for index_name, index_instance in indexes.items():
     add_routes(app, index_instance.retriever, path=f"/retrieve_{index_name}")
