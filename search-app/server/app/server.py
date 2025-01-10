@@ -169,7 +169,8 @@ async def call_graph(request: Request, response: Response, query_data: Query):
     else:
         session = request.cookies[COOKIE_NAME]
         if session not in state_session_to_graph:
-            raise HTTPException(status_code=400, detail="Invalid session!")
+            session = await _create_session(response=response)
+            logger.debug(f"session exposed .. new session created: {session}")
 
     thread_id = session
     session_data = state_session_to_graph[thread_id]
