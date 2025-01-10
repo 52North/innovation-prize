@@ -33,46 +33,52 @@
         </div>
         <div class="scrollable-content">
           <div v-if="searchResults.length > 0">
-            <h4><b-icon-clipboard-data></b-icon-clipboard-data>  Result List:</h4>
-            <h5>Number of Results: {{ searchResults.length }}</h5>
-            <ul>
-              <li v-for="(result, index) in searchResults" :key="index" @mouseover="setHoveredResult(index)"
-                @mouseleave="clearHoveredResult">
-                <a :href="result.url" target="_blank">
-                  <h5 v-if="apiResponse.index_name == 'geojson'">Feature: {{ result.title }}</h5>
-                  <h5 v-else>Dataset: {{ result.title }}</h5>
+            <b-tabs content-class="mt-2">
+              <b-tab title="Results">
+                <h4><b-icon-clipboard-data></b-icon-clipboard-data>Result List:</h4>
+                <h5>Number of Results: {{ searchResults.length }}</h5>
+                <ul>
+                  <li v-for="(result, index) in searchResults" :key="index" @mouseover="setHoveredResult(index)"
+                    @mouseleave="clearHoveredResult">
+                    <a :href="result.url" target="_blank">
+                      <h5 v-if="apiResponse.index_name == 'geojson'">Feature: {{ result.title }}</h5>
+                      <h5 v-else>Dataset: {{ result.title }}</h5>
 
-                </a>
-                <p>{{ result.description }}</p>
-                <div class="result-links">
-                <div>
-                  <button @click="setZoomToFeature(index)" class="btn btn-light">
-                    <b-icon-zoom-in></b-icon-zoom-in>
-                    Show on map
-                  </button>
-                </div>
-             
-                <div>
-                  <a :href="result.url" class="btn btn-light" target="_blank">
-                    <b-icon-arrow-right-circle></b-icon-arrow-right-circle>
-                    Go to source</a>
-                </div>
-              </div>
-                   <!--
-              <div class="keywords">
-                <strong>Keywords:</strong>
-                <span v-for="(keyword, kIndex) in result.keywords" :key="kIndex" class="badge badge-pill badge-warning">
-                  {{ keyword }}
-                </span>
-              </div>
-              -->
-              </li>
-            </ul>
-          </div>
+                    </a>
+                    <p>{{ result.description }}</p>
+                    <div class="result-links">
+                    <div>
+                      <button @click="setZoomToFeature(index)" class="btn btn-light">
+                        <b-icon-zoom-in></b-icon-zoom-in>
+                        Show on map
+                      </button>
+                    </div>
+                
+                    <div>
+                      <a :href="result.url" class="btn btn-light" target="_blank">
+                        <b-icon-arrow-right-circle></b-icon-arrow-right-circle>
+                        Go to source</a>
+                    </div>
+                  </div>
+                      <!--
+                  <div class="keywords">
+                    <strong>Keywords:</strong>
+                    <span v-for="(keyword, kIndex) in result.keywords" :key="kIndex" class="badge badge-pill badge-warning">
+                      {{ keyword }}
+                    </span>
+                  </div>
+                  -->
+                  </li>
+                </ul>
+              </b-tab>
 
-          <h4>API Response</h4>
-          <div class="json-display">
-            <vue-json-pretty :data="apiResponse" :deep="3"></vue-json-pretty>
+              <b-tab title="Raw Response">
+                <h4>API Response</h4>
+                <div class="json-display">
+                  <vue-json-pretty :data="apiResponse" :deep="3"></vue-json-pretty>
+                </div>
+              </b-tab>
+            </b-tabs>
           </div>
         </div>
       </div>
