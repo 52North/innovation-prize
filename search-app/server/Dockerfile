@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-ENV ROOT_PATH="/"
+ARG ROOT_PATH="/"
 ENV LOGURU_LEVEL="INFO"
 
 RUN pip install poetry==1.6.1
