@@ -60,14 +60,17 @@ class Indexer():
                documents: List[Document],
                cleanup=None,
                source_id_key: str="url"):
-        logger.info(f"Indexing recieved documents - using {self.embedding_model} as embedding model")
-        return index(
+        logger.debug(f"Indexing recieved documents - using {self.embedding_model} as embedding model")
+        result = index(
             documents,  
             self.record_manager,
             self.vectorstore,
             cleanup=cleanup,
             source_id_key=source_id_key,
         )
+        
+        logger.debug(f"Indexing done: {result}")
+        return result
 
     def _get_doc_by_id(self,
                        _id: str):
