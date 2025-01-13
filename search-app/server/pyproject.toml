@@ -13,7 +13,6 @@ python = ">=3.10,<3.13"
 uvicorn = "0.23.2"
 langserve = "0.3.0"
 nest-asyncio = "^1.6.0"
-chromadb = "0.5.0"
 geojson = "3.1.0"
 bs4 = "^0.0.1"
 gpt4all = "2.8.2"
@@ -40,6 +39,10 @@ typing-extensions = "4.12.2"
 langgraph-checkpoint-sqlite = "^2.0.1"
 duckduckgo-search = "^7.2.1"
 loguru = "^0.7.3"
+gunicorn = "^23.0.0"
+langchain-chroma = "^0.2.0"
+chromadb = "0.5.3"
+ultradict = "^0.0.6"
 
 [tool.poetry.extras]
 runtime = ["semantic-router"]

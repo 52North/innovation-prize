@@ -1,42 +1,40 @@
-from fastapi import FastAPI, HTTPException
+import os
+from uuid import  uuid4
+from typing import List
+import geojson
+import json
+from typing import Optional, Dict, Any
+
+from loguru import logger
+from pydantic import BaseModel
+
 from contextlib import asynccontextmanager
+from fastapi import HTTPException, FastAPI, Depends, Request, Response, Security
 from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.security.api_key import APIKeyHeader, APIKey
+from fastapi.middleware.cors import CORSMiddleware
+
 from langserve import add_routes
-from graph.graph import SpatialRetrieverGraph, State
-from graph.routers import CollectionRouter
-from config.config import Config
-from indexing.indexer import Indexer
-from connectors.pygeoapi_retriever import PyGeoAPI
-from connectors.geojson_osm import GeoJSON
-from result_explainer.search_result_explainer import SimilarityExplainer
 from langchain.schema import Document
 from langchain_core.messages import HumanMessage, AIMessage
+# from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-from fastapi.middleware.cors import CORSMiddleware
+from app.indexer_manager import indexer_manager
 from app.utils import (
     SessionData,
     calculate_bounding_box,
     summarize_feature_collection_properties,
     load_conversational_prompts
 )
-
-# from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-
-
-
-from fastapi import HTTPException, FastAPI, Depends, Request, Response, Security
-from fastapi.security.api_key import APIKeyHeader, APIKey
-# from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
-from uuid import UUID, uuid4
-from typing import List
-import geojson
-from pydantic import BaseModel
-import json
-from loguru import logger
-from typing import Optional, Dict, Any
-
+from graph.routers import CollectionRouter
+from graph.graph import SpatialRetrieverGraph, State
+from connectors.pygeoapi_retriever import PyGeoAPI
+from connectors.geojson_osm import GeoJSON
+from result_explainer.search_result_explainer import SimilarityExplainer
+from indexing.indexer import Indexer
 from config.config import CONFIG
+
 
 
 COOKIE_NAME = "search_app-session"
@@ -54,7 +52,7 @@ memory = AsyncSqliteSaver.from_conn_string(memory_path)
 
 # Authentificate
 API_KEY = CONFIG.sdsa_api_key  # Replace with your actual API key
-API_KEY_NAME = "X-API-Key"
+API_KEY_NAME = "x-api-key"
 
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
@@ -82,27 +80,20 @@ conversational_prompts = load_conversational_prompts(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    indexes = {
-        "pygeoapi": Indexer(index_name="pygeoapi",
-                            score_treshold=0.4,
-                            k=20),
-        "geojson": Indexer(index_name="geojson",  # Add indexer for local geojson with OSM features
-                        score_treshold=0.4,
-                        k=20,
-                        # use_hf_model=True,
-                        # embedding_model="Alibaba-NLP/gte-large-en-v1.5"
-                        )
-    }
-    
+    indexer_manager.initialize()
+    indexes = indexer_manager.get_indexes()
     for index_name, index_instance in indexes.items():
         add_routes(app, index_instance.retriever, path=f"/retrieve_{index_name}")
+    
+    logger.debug("indexes have been initialized and /retrieve_<index-name> routes were added.")
     app.state.indexes = indexes
     
     yield
     
-    del indexes
+    del app.state.indexes
 
-app = FastAPI(lifespan=lifespan)
+root_path = os.getenv("ROOT_PATH", "/")
+app = FastAPI(root_path=root_path, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -114,9 +105,9 @@ app.add_middleware(
 
 
 async def get_api_key(api_key_header: str = Security(api_key_header)):
-    if api_key_header == API_KEY:
+    if api_key_header and api_key_header.lower() == API_KEY:
         return api_key_header
-    raise HTTPException(status_code=403, detail="Could not validate API Key")
+    raise HTTPException(status_code=403, detail=f"Could not validate API Key.")
 
 
 

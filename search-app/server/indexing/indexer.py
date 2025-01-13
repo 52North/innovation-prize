@@ -1,4 +1,4 @@
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_community.embeddings import GPT4AllEmbeddings
 from langchain.indexes import SQLRecordManager, index
 from typing import List
@@ -38,18 +38,14 @@ class Indexer():
         self.vectorstore = Chroma(persist_directory=CONFIG.chroma_dir,
                                   embedding_function=self.embedding_function,
                                   collection_name=index_name)
-        
-        self.namespace = f"chromadb/{index_name}"
-        
-        self.record_manager = SQLRecordManager(
-            self.namespace, db_url="sqlite:///record_manager_cache.sql"
-        )
-        
-        # self.retriever = self.vectorstore.as_retriever(search_kwargs={"k": 20})
         self.retriever = self.vectorstore.as_retriever(search_type="similarity_score_threshold",
                                                        search_kwargs={"score_threshold": score_treshold,
                                                                       "k": k},)
 
+        self.namespace = f"chromadb/{index_name}"
+        self.record_manager = SQLRecordManager(
+            self.namespace, db_url="sqlite:///record_manager_cache.sql"
+        )
         self.record_manager.create_schema()
 
     def _clear(self):
