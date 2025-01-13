@@ -13,27 +13,27 @@ from loguru import logger
 
 from config.config import CONFIG
 
-OPENAI_API_KEY = CONFIG.openai_api_key
-
 class CollectionRouter():
     def __init__(self):
-        self.persist_dir = CONFIG.chroma_dir
+        self.database_dir = CONFIG.database_dir
         self.llm = ChatOpenAI(model="gpt-4o-mini")
         self.encoder = OpenAIEncoder()
         self.setup()
 
     def setup(self):
-        self.coll_dicts = self.get_collection_info(persist_dir=self.persist_dir)
+        self.coll_dicts = self.get_collection_info(database_dir=self.database_dir)
         self.routes = [self.generate_route(collection_dict=coll) for coll in self.coll_dicts]
         self.rl = RouteLayer(encoder=self.encoder, routes=self.routes)
 
-    def get_collection_info(self, persist_dir: str) -> dict:
+    def get_collection_info(self, database_dir: str) -> dict:
         """
         Fetching information about existing collections
         """
-        client = chromadb.Client(Settings(is_persistent=True,
-                                        persist_directory=persist_dir,
-                                        ))
+        settings = Settings(
+            is_persistent=True,
+            persist_directory=database_dir,
+        )
+        client = chromadb.Client(settings=settings)
 
         collections = client.list_collections()
 
