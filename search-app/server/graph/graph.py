@@ -1,6 +1,7 @@
 from typing import Annotated, Sequence, TypedDict, List
 from langchain_core.messages import BaseMessage
 from langgraph.graph import END, StateGraph
+from langchain.schema import Document
 import operator
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_community.tools import DuckDuckGoSearchResults
@@ -46,6 +47,7 @@ class State(TypedDict):
     search_results: List
     ready_to_retrieve: str
     index_name: str
+    custom_system_prompt: str
 
 
 class SpatialRetrieverGraph(StateGraph):
@@ -55,7 +57,8 @@ class SpatialRetrieverGraph(StateGraph):
                  memory,
                  search_indexes: dict,
                  collection_router,
-                 conversational_prompts: dict = None
+                 conversational_prompts: dict = None,
+                 custom_system_prompt: str = None
                  ):
         super().__init__(State)
 
@@ -141,12 +144,17 @@ class SpatialRetrieverGraph(StateGraph):
         route_choice = self.get_route_choice(self.thread_id, input_text)
 
         prompt = None
-        if route_choice.name:
-            logger.info(f"Chosen route: {route_choice.name}")
-            state["index_name"] = route_choice.name
-            prompt = self.conversational_prompts[route_choice.name]
-        else:
-            logger.info("No route chosen, routing to default")
+
+        if 'custom_system_prompt' in state:
+            logger.info(f"Using custom system prompt from API call: {state['custom_system_prompt']}")
+            prompt = state['custom_system_prompt']
+        else:       
+            if route_choice.name:
+                logger.info(f"Chosen route: {route_choice.name}")
+                state["index_name"] = route_choice.name
+                prompt = self.conversational_prompts[route_choice.name]
+            else:
+                logger.info("No route chosen, routing to default")
 
         response = run_converstation_chain(input=state["messages"][-1].content,
                                            chat_history=chat_history,
@@ -249,7 +257,7 @@ class SpatialRetrieverGraph(StateGraph):
             try:
                 search_results = []
                 # Todo: do not hard code index name here
-                if state["index_name"] == "geojson":
+                if state.get("index_name", "") == "geojson":
                     query_bbox = state['spatio_temporal_context']
 
                     all_results = await asyncio.to_thread(
@@ -266,11 +274,18 @@ class SpatialRetrieverGraph(StateGraph):
                     context = f"Searched index: {search_index_info}. Top-{len(search_results)} results in spatial extent: {doc_contents}"
 
                 else:
-                    search_results = state["search_results"][:10]
+                    if isinstance(state.get('search_results'), list):  
+                        search_results = state["search_results"][:10]
+                    else:
+                        search_results = state["search_results"]
 
                     logger.info(f"search results: {search_results}")
+
                     doc_contents = "\n\n".join(
-                        doc.page_content for doc in search_results)
+                        doc.page_content if isinstance(doc, Document) else doc.get("snippet", "")
+                        for doc in search_results
+                        if isinstance(doc, Document) or isinstance(doc, dict)
+                    )
                     
                     context = f"Searched index: {search_index_info}. Top-{len(search_results)} results: {doc_contents}"
 
@@ -279,6 +294,11 @@ class SpatialRetrieverGraph(StateGraph):
                     state['search_results'] = []
 
                 query = state["search_criteria"]
+                custom_system_prompt = state.get("custom_system_prompt", None)
+
+                if custom_system_prompt:
+                    query = f"System prompt: {custom_system_prompt}. Query: {query}"
+
                 logger.info(f"Context for rag: {context}")
                 answer = await final_answer_chain.ainvoke({"query": query, "context": context})
                 answer = answer.strip()

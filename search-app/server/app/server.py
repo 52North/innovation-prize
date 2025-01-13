@@ -140,7 +140,8 @@ async def _create_session(request: Request, response: Response):
                                               memory=memory,
                                               search_indexes=request.app.state.indexes,
                                               collection_router=collection_router,
-                                              conversational_prompts=conversational_prompts
+                                              conversational_prompts=conversational_prompts,
+                                              custom_system_prompt="",
                                               ).compile()
 
     data = SessionData(session_id=session_id, graph=graph)
@@ -159,7 +160,7 @@ async def create_session(request: Request, response: Response):
 class Query(BaseModel):
     query: str
     spatio_temporal_context: Optional[Dict[str, Any]] = None
-
+    custom_system_prompt: str = None
 
 @app.post("/data")
 async def call_graph(request: Request, response: Response, query_data: Query):
@@ -202,12 +203,14 @@ async def call_graph(request: Request, response: Response, query_data: Query):
     if query_data.spatio_temporal_context:
         inputs['spatio_temporal_context'] = query_data.spatio_temporal_context
 
+    if query_data.custom_system_prompt:
+        inputs['custom_system_prompt'] = query_data.custom_system_prompt
+
     graph = session_data.graph
     graph.thread_id = thread_id
     response = await graph.ainvoke(inputs)
     
     return response
-
 
 @app.get("/fetch_documents")
 async def fetch_documents(request: Request, indexing: bool = True, api_key: APIKey = Depends(get_api_key)):
