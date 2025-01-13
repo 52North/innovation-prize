@@ -5,7 +5,15 @@ from loguru import logger
 
 class IndexerManager:
     def __init__(self):
-        self.indexes = UltraDict(name="indexer_manager")
+        retry_count = 0
+        while retry_count < 5:
+            try:
+                # multiple workers are trying to create shared memory
+                self.indexes = UltraDict(name="indexer_manager")
+                break
+            except FileExistsError:
+                retry_count +=1
+                time.sleep(0.5)
         self.lock_timeout = 600 # Lock timeout in seconds
 
     def _wait_for_initialization(self):
