@@ -15,7 +15,7 @@ services:
       - TAVILY_API_KEY=${TAVILY_API_KEY}
       - LOGURU_LEVEL=${LOGURU_LEVEL:-INFO}
     volumes:
-      - indexes:/app/chroma_db
+      - indexes:/app/db
     ports:
       - 8000:8080
     #command: sleep infinity

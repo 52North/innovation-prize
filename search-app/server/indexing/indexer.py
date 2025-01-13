@@ -35,7 +35,7 @@ class Indexer():
         else:
             self.embedding_function = GPT4AllEmbeddings(model_name=embedding_model)
 
-        self.vectorstore = Chroma(persist_directory=CONFIG.chroma_dir,
+        self.vectorstore = Chroma(persist_directory=CONFIG.database_dir,
                                   embedding_function=self.embedding_function,
                                   collection_name=index_name)
         self.retriever = self.vectorstore.as_retriever(search_type="similarity_score_threshold",
@@ -43,9 +43,8 @@ class Indexer():
                                                                       "k": k},)
 
         self.namespace = f"chromadb/{index_name}"
-        self.record_manager = SQLRecordManager(
-            self.namespace, db_url="sqlite:///record_manager_cache.sql"
-        )
+        db_url = f"sqlite:///{CONFIG.database_dir}/record_manager_cache.sqlite3"
+        self.record_manager = SQLRecordManager(self.namespace, db_url=db_url)
         self.record_manager.create_schema()
 
     def _clear(self):

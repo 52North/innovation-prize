@@ -12,13 +12,13 @@ class Config:
     """Config file"""
     def __init__(self) -> None:
         default_config_path = resolve_abs_path("./config/config.json")
-        default_chroma_dir = resolve_abs_path("./server/chroma_db")
+        default_db_dir = resolve_abs_path("./db")
 
         # set config from env
         self.config_file = os.getenv('CONFIG_FILE', default_config_path)
-        self.chroma_dir = os.getenv("CHROMA_DIR", default_chroma_dir)
+        self.database_dir = os.getenv("DATABASE_DIR", default_db_dir)
         logger.debug(f"Read config from '{self.config_file}'")
-        logger.debug(f"Use chroma dir '{self.chroma_dir}'")
+        logger.debug(f"Use database dir '{self.database_dir}'")
         
         self.load_config_file()
         
