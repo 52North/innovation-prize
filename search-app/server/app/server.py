@@ -272,8 +272,8 @@ def generate_combined_feature_collection(doc_list: List[Document]):
 
 
 @app.get("/retrieve_geojson")
-async def retrieve_geojson(query: str):
-    features = indexes['geojson'].retriever.invoke(query)
+async def retrieve_geojson(request: Request, query: str):
+    features = request.app.state.indexes['geojson'].retriever.invoke(query)
 
     feature_collection = generate_combined_feature_collection(features)
 
