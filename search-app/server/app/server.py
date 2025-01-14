@@ -123,7 +123,7 @@ async def unicorn_exception_handler(request: Request, exc: Exception):
 
 @app.get("/")
 async def redirect_root_to_docs():
-    return RedirectResponse("/docs")
+    return RedirectResponse("docs")
 
 
 async def _create_session(request: Request, response: Response):
