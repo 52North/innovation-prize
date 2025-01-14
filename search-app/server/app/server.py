@@ -228,7 +228,7 @@ async def fetch_documents(request: Request, indexing: bool = True, api_key: APIK
         res_pygeoapi = request.app.state.indexes["pygeoapi"]._index(documents=pygeoapi_docs)
 
         # In case the collection changes significantly, also update the custom prompts
-        if (res_pygeoapi["num_added"] > 20) or (res_pygeoapi["updated"] > 20):
+        if (res_pygeoapi["num_added"] > 20) or (res_pygeoapi["num_updated"] > 20):
             collection_router.setup()
             load_conversational_prompts(collection_router=collection_router)
 
