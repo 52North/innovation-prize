@@ -40,11 +40,15 @@
                 <ul>
                   <li v-for="(result, index) in searchResults" :key="index" @mouseover="setHoveredResult(index)"
                     @mouseleave="clearHoveredResult">
-                    <a :href="result.url" target="_blank">
+                    <a v-if="result.url" :href="result.url" target="_blank">
                       <h5 v-if="apiResponse.index_name == 'geojson'">Feature: {{ result.title }}</h5>
                       <h5 v-else>Dataset: {{ result.title }}</h5>
 
                     </a>
+                    <div v-else>
+                      <h5 v-if="apiResponse.index_name == 'geojson'">Feature: {{ result.title }}</h5>
+                      <h5 v-else>Dataset: {{ result.title }}</h5>
+                    </div>
                     <p>{{ result.description }}</p>
                     <div class="result-links">
                     <div>
@@ -242,13 +246,16 @@ export default {
             this.searchResults = this.apiResponse.search_results.map(doc => {
               const extent = this.parseExtent(doc.metadata.feature);
               console.log("Extent: " + extent);
-              return {
+              const item = {
                 title: doc.metadata.name,
                 description: this.parseDescription(doc.page_content),
                 //keywords: this.extractKeywords(doc.page_content),
-                url: doc.metadata.url,
                 extent: extent
               };
+              if (doc.metadata.url) {
+                item.url = doc.metadata.url;
+              }
+              return item;
             });
           }
         }
