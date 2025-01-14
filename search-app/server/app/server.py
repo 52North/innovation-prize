@@ -41,8 +41,9 @@ COOKIE_NAME = "search_app-session"
 
 # Define the origins that should be allowed to make requests to your API
 origins = [
-    "http://localhost",
-    "http://localhost:5173",
+    "*",
+    # "http://localhost",
+    # "http://localhost:5173",
 ]
 
 # Init memory:
