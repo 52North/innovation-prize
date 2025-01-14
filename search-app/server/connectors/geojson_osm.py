@@ -199,7 +199,7 @@ class GeoJSON():
             metadata = {
                 "type": properties.get(self.tag_name, "Unknown"),
                 "feature": json.dumps(feature["geometry"] , indent=2),
-                "url": str(properties.get("id", "url"))
+                # "url": str(properties.get("id", "url"))
             }
 
             for property, value in feature["properties"].items():
