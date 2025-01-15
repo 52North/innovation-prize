@@ -244,7 +244,9 @@ export default {
             }
 
             this.searchResults = this.apiResponse.search_results.map(doc => {
-              const spatialExtent = this.calcExtentFromBbox(doc.metadata.extent?.spatial.bbox) || this.calcExtentFromGeoJson(doc.metadata.feature);
+              const spatialExtent = doc.metadata.extent 
+                ? this.calcExtentsFromBboxes(doc.metadata.extent.spatial.bbox)
+                : this.calcExtentsFromGeoJson(doc.metadata.feature);
               const bboxes = Array.isArray(spatialExtent) ? spatialExtent : [ spatialExtent ]
               console.log("Extent: " + bboxes);
               const item = {
@@ -289,7 +291,7 @@ export default {
       const match = regex.exec(pageContent);
       return match ? match[1].split(',').map(keyword => keyword.trim().slice(1, -1)) : [];
     },
-    calcExtentFromBbox(bboxes) {
+    calcExtentsFromBboxes(bboxes) {
       const extents = []
       for (let i = 0; i < bboxes.length; i++) {
         const bbox = bboxes[i];
@@ -301,7 +303,7 @@ export default {
       }
       return extents;
     },
-    calcExtentFromGeoJson(geoJsonStr) {
+    calcExtentsFromGeoJson(geoJsonStr) {
       const geoJson = JSON.parse(geoJsonStr);
 
       if (geoJson.type !== 'Polygon' || !geoJson.coordinates || geoJson.coordinates.length === 0) {
@@ -324,7 +326,7 @@ export default {
         if (lng > maxLng) maxLng = lng;
       });
 
-      return [[minLat, minLng], [maxLat, maxLng]]; // Leaflet expects [southWest, northEast]
+      return [[[minLat, minLng], [maxLat, maxLng]]]; // Leaflet expects [southWest, northEast]
       //return [minLng, minLat, maxLng, maxLat];
     },
     scrollToBottom() {
