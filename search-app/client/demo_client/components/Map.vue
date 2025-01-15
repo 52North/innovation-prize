@@ -64,11 +64,12 @@ export default {
 
         // Add new rectangles based on search results
         props.searchResults.forEach((result, index) => {
-          if (result.extent) {
-            const rectangle = L.rectangle(result.extent, {
+          if (result.bboxes) {
+            // hack: only get the first bbox
+            const rectangle = L.rectangle(result.bboxes[0], {
               color: "#ff7800",
               weight: 1,
-              fillOpacity: 0.2
+              fillOpacity: 0.01
             }).addTo(map);
             rectangles.push(rectangle);
           }

@@ -37,23 +37,23 @@ export default {
 		async initializeSession() {
 			const sessionCookie = Cookies.get('session_id');
 
-			// if (!sessionCookie) {
+			if (!sessionCookie) {
 
-			// 	try {
-			// 		const response = await axios.post(`${config.BACKEND_API_URL}/create_session`, {}, {
-			// 			withCredentials: true // This is important for cross-origin requests with credentials
-			// 		});
-			// 		console.log("Registered with ", response.data);
+				try {
+					const response = await axios.post(`${config.BACKEND_API_URL}/create_session`, {}, {
+						withCredentials: true // This is important for cross-origin requests with credentials
+					});
+					console.log("Registered with ", response.data);
 
-			// 		// The server should set the cookie automatically
-			// 		// You don't need to manually set it using Cookies.set()
+					// The server should set the cookie automatically
+					// You don't need to manually set it using Cookies.set()
 
-			// 		this.apiError = false;
-			// 	} catch (error) {
-			// 		console.error('Error creating session:', error);
-			// 		this.apiError = true;
-			// 	}
-			// }
+					this.apiError = false;
+				} catch (error) {
+					console.error('Error creating session:', error);
+					this.apiError = true;
+				}
+			}
 		}
 	}
 	};

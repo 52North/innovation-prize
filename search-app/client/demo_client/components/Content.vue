@@ -244,13 +244,14 @@ export default {
             }
 
             this.searchResults = this.apiResponse.search_results.map(doc => {
-              const extent = this.parseExtent(doc.metadata.feature);
-              console.log("Extent: " + extent);
+              const spatialExtent = this.calcExtentFromBbox(doc.metadata.extent?.spatial.bbox) || this.calcExtentFromGeoJson(doc.metadata.feature);
+              const bboxes = Array.isArray(spatialExtent) ? spatialExtent : [ spatialExtent ]
+              console.log("Extent: " + bboxes);
               const item = {
-                title: doc.metadata.name,
+                title: doc.metadata.title || doc.metadata.name,
                 description: this.parseDescription(doc.page_content),
                 //keywords: this.extractKeywords(doc.page_content),
-                extent: extent
+                bboxes: bboxes
               };
               if (doc.metadata.url) {
                 item.url = doc.metadata.url;
@@ -288,7 +289,19 @@ export default {
       const match = regex.exec(pageContent);
       return match ? match[1].split(',').map(keyword => keyword.trim().slice(1, -1)) : [];
     },
-    parseExtent(geoJsonStr) {
+    calcExtentFromBbox(bboxes) {
+      const extents = []
+      for (let i = 0; i < bboxes.length; i++) {
+        const bbox = bboxes[i];
+        const minLat = bbox[0];
+        const minLon = bbox[1];
+        const maxLat = bbox[2];
+        const maxLon = bbox[3];
+        extents.push([[minLon, minLat], [ maxLon, maxLat]]);
+      }
+      return extents;
+    },
+    calcExtentFromGeoJson(geoJsonStr) {
       const geoJson = JSON.parse(geoJsonStr);
 
       if (geoJson.type !== 'Polygon' || !geoJson.coordinates || geoJson.coordinates.length === 0) {
