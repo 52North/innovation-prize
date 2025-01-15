@@ -83,17 +83,19 @@ conversational_prompts = load_conversational_prompts(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    indexer_manager.initialize()
-    indexes = indexer_manager.get_indexes()
-    for index_name, index_instance in indexes.items():
-        add_routes(app, index_instance.retriever, path=f"/retrieve_{index_name}")
-    
-    logger.debug("indexes have been initialized and /retrieve_<index-name> routes were added.")
-    app.state.indexes = indexes
-    
-    yield
-    
-    del app.state.indexes
+    try:
+        indexer_manager.initialize()
+        indexes = indexer_manager.get_indexes()
+        for index_name, index_instance in indexes.items():
+            add_routes(app, index_instance.retriever, path=f"/retrieve_{index_name}")
+        
+        logger.debug("indexes have been initialized and /retrieve_<index-name> routes were added.")
+        app.state.indexes = indexes
+        yield
+    finally:
+        indexer_manager.close()
+        if hasattr(app.state, "indexes"):
+            del app.state.indexes
 
 root_path = os.getenv("ROOT_PATH", "/")
 app = FastAPI(root_path=root_path, lifespan=lifespan)

@@ -45,6 +45,11 @@ class IndexerManager:
 
     def get_indexes(self):
         return self.indexes
+    
+    def close(self):
+        if not self.indexes.closed:
+            self.indexes.close(unlink=True)
+        del self.indexes
 
 # Global Object Pattern
 indexer_manager = IndexerManager()
