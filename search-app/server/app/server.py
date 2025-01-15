@@ -259,7 +259,8 @@ async def index_geojson_osm(request: Request, api_key: APIKey = Depends(get_api_
 
     if (res_local["num_added"] > 20) or (res_local["num_updated"] > 20):
         collection_router.setup()
-        load_conversational_prompts(collection_router=collection_router)
+        global conversational_prompts
+        conversational_prompts = load_conversational_prompts(collection_router=collection_router)
 
     return res_local
 
