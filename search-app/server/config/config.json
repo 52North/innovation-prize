@@ -9,11 +9,20 @@
         "temperature": 0
     },
     "pygeoapi_instances": [
-        {"url": "https://api.weather.gc.ca/", 
-        "exclude_collections": [
-            "https://api.weather.gc.ca/collections/climate:dcs:historical:seasonal:absolute?lang=en",
-            "https://api.weather.gc.ca/collections/climate:dcs:projected:monthly:absolute?lang=en"
+        {
+            "url": "https://api.weather.gc.ca/", 
+            "exclude_collections": [
+                "https://api.weather.gc.ca/collections/climate:dcs:historical:seasonal:absolute?lang=en",
+                "https://api.weather.gc.ca/collections/climate:dcs:projected:monthly:absolute?lang=en"
             ]
+        },
+        {
+            "url": "https://geoapi.geoplatform.gov/",
+            "exclude_collections": []
+        },
+        {
+            "url": "https://reference.geoconnex.us/",
+            "exclude_collections": []
         }
     ],
     "web_geojson_resources": [
