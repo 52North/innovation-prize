@@ -33,7 +33,10 @@ from connectors.pygeoapi_retriever import PyGeoAPI
 from connectors.geojson_osm import GeoJSON
 from result_explainer.search_result_explainer import SimilarityExplainer
 from indexing.indexer import Indexer
-from config.config import CONFIG
+from config.config import (
+    CONFIG,
+    resolve_abs_path
+)
 
 
 
@@ -47,8 +50,7 @@ origins = [
 ]
 
 # Init memory:
-memory_path = "checkpoint.db"
-memory = AsyncSqliteSaver.from_conn_string(memory_path)
+memory_path = resolve_abs_path(f"{CONFIG.database_dir}/checkpoint.db")
 
 
 # Authentificate
@@ -138,7 +140,7 @@ async def _create_session(request: Request, response: Response):
                                               search_results=[], 
                                               ready_to_retrieve=""), 
                                               thread_id=session_id, 
-                                              memory=memory,
+                                              memory_path=memory_path,
                                               search_indexes=request.app.state.indexes,
                                               collection_router=collection_router,
                                               conversational_prompts=conversational_prompts,
@@ -163,6 +165,11 @@ class Query(BaseModel):
     spatio_temporal_context: Optional[Dict[str, Any]] = None
     custom_system_prompt: str = None
 
+async def table_exists(cursor, table_name):
+    await cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+    result = await cursor.fetchone()
+    return result is not None
+
 @app.post("/data")
 async def call_graph(request: Request, response: Response, query_data: Query):
     global state_session_to_graph
@@ -182,21 +189,21 @@ async def call_graph(request: Request, response: Response, query_data: Query):
     
     # Add an explicit reset command
     if query_data.query == 'reset':
-        #if graph.memory.conn.is_alive():
-        if memory.conn.is_alive():
-            #async with graph.memory.conn.cursor() as cur:
-            async with memory.conn.cursor() as cur:
-                # Check if checkpoints exist
-                await cur.execute(f"SELECT * FROM checkpoints WHERE thread_id = '{thread_id}';")
-                checkpoints = await cur.fetchall()
-                if checkpoints:
-                    await cur.execute(f"DELETE FROM checkpoints WHERE thread_id = '{thread_id}' ;")
+        async with AsyncSqliteSaver.from_conn_string(memory_path) as memory:
+            
+            cursor = await memory.conn.cursor()
+            if await table_exists(cursor, "checkpoints"):
+                await cursor.execute(f"SELECT * FROM checkpoints WHERE thread_id = '{thread_id}';")
+                checkpoint = await cursor.fetchone()
+                if checkpoint:
+                    del state_session_to_graph[session]
+                    await cursor.execute(f"DELETE FROM checkpoints WHERE thread_id = '{thread_id}' ;")
                     return {"messages": [AIMessage(content="Okay, let's start a new search. What kind of data are you looking for?")]}
 
                 else:
                     return {"messages": "No previous chat history"}
-        else:
-            return {"messages": "No previous chat history"}
+            else:
+                return {"messages": "No previous chat history"}
 
     print(f"-#-#--Running graph---- Using session_id: {thread_id}")
     inputs = {"messages": [HumanMessage(content=query_data.query)]}

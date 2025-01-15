@@ -51,22 +51,23 @@ class State(TypedDict):
 
 
 class SpatialRetrieverGraph(StateGraph):
-    def __init__(self,
-                 state: State,
-                 thread_id: int,
-                 memory,
-                 search_indexes: dict,
-                 collection_router,
-                 conversational_prompts: dict = None,
-                 custom_system_prompt: str = None
-                 ):
+    def __init__(
+        self,
+        state: State,
+        thread_id: int,
+        memory_path,
+        search_indexes: dict,
+        collection_router,
+        conversational_prompts: dict = None,
+        custom_system_prompt: str = None,
+    ):
         super().__init__(State)
 
         self.setup_graph()
 
         self.counter = 0
         self.thread_id = thread_id
-        self.memory = memory
+        self.memory_path = memory_path
         self.search_indexes = search_indexes
         self.conversational_prompts = conversational_prompts
         self.route_layer = collection_router.rl
@@ -329,8 +330,7 @@ class SpatialRetrieverGraph(StateGraph):
         
         config = {"configurable": {"thread_id": self.thread_id, 
                                    "checkpoint_ns": ""}}
-        async with AsyncSqliteSaver.from_conn_string("checkpoint.db") as memory:
-            # await memory.aput(config=config, checkpoint=checkpoint)
+        async with AsyncSqliteSaver.from_conn_string(self.memory_path) as memory:
             await memory.aput(config, checkpoint, {}, {})
 
         return state
@@ -338,10 +338,9 @@ class SpatialRetrieverGraph(StateGraph):
     async def _get_history_from_memory(self):
         config = {"configurable": {"thread_id": self.thread_id}}
 
-        async with AsyncSqliteSaver.from_conn_string("checkpoint.db") as memory:
-            history = [c.checkpoint.get('data') async for c in memory.alist(config)]
+        async with AsyncSqliteSaver.from_conn_string(self.memory_path) as memory:
+            history = [c.checkpoint.get("data") async for c in memory.alist(config)]
 
-        # history = [checkpoint.checkpoint["data"] async for checkpoint in self.memory.alist(config=config)]
         print(f"---retrieving state for thread: {self.thread_id}")
         if history:
             return history
