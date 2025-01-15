@@ -11,6 +11,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.output_parsers import JsonOutputParser
 from langchain.output_parsers import OutputFixingParser
 import json
+import ast
 from langchain.tools import tool
 from pydantic import BaseModel, Field
 from typing import Literal
@@ -165,7 +166,10 @@ def generate_search_tool(coll_dict):
                                                               search_kwargs=search_kwargs)
 
         docs = retriever.invoke(query)
-        
+        if search_index.index_name == "pygeoapi":
+            for d in docs:
+                d.metadata["extent"] = ast.literal_eval(d.metadata["extent"])
+
         return docs
 
     search_tool.__doc__ = docstring
