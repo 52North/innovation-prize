@@ -133,9 +133,7 @@ class CollectionRouter():
             - Be friendly and conversational.
             - Keep responses efficient and purposeful.
 
-            **Example Conversations:** [Include 3 brief example conversations]
-
-            Here is the collection you should consider when generating the prompt: {collection}""",            
+            Here is the collection you should consider when generating the prompt: {collection}""",
             input_variables=["collection"],
         )
         chain = (
