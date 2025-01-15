@@ -6,8 +6,6 @@ from .prompts import(
 from .spatial_utilities import (
     generate_spatial_context_chain
 )
-from langchain_openai import ChatOpenAI
-from config.config import Config
 from langchain_openai import OpenAI
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.output_parsers import JsonOutputParser
@@ -21,7 +19,6 @@ from loguru import logger
 from semantic_router import Route
 from semantic_router.encoders import OpenAIEncoder
 from semantic_router.layer import RouteLayer
-import os
 from langchain_groq import ChatGroq
 from app.llm_manager import LLMManager
 
@@ -91,13 +88,14 @@ def run_converstation_chain(input: str, chat_history, prompt=None):
     output_fixer = OutputFixingParser.from_llm(parser=output_parser, llm=llm)
 
     format_instructions = output_parser.get_format_instructions()
+    format_instructions += ". WICHTIG: Gebe nur das reine JSON zurück, ohne zusätzlichen Text oder Erklärungen."
 
     dynamic_prompt = generate_conversation_prompt(format_instructions=format_instructions, system_prompt=prompt)
 
     # Chains
     conversation_chain = (        
         dynamic_prompt
-        | llm 
+        | llm
         #| output_parser
     ) 
 
