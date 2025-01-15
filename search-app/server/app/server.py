@@ -240,11 +240,13 @@ async def fetch_documents(request: Request, indexing: bool = True, api_key: APIK
         # In case the collection changes significantly, also update the custom prompts
         if (res_pygeoapi["num_added"] > 20) or (res_pygeoapi["num_updated"] > 20):
             collection_router.setup()
-            load_conversational_prompts(collection_router=collection_router)
+            global conversational_prompts
+            conversational_prompts = load_conversational_prompts(collection_router=collection_router)
 
-    return {'indexing_results': {
-        'pygeoapi': res_pygeoapi,
-    }
+    return {
+        'indexing_results': {
+            'pygeoapi': res_pygeoapi,
+        }
     }
 
 
@@ -296,6 +298,8 @@ async def retrieve_geojson(request: Request, query: str):
     Spatial Extent of all features: {spatial_extent}
     """
 
+    global conversational_prompts
+    conversational_prompts = load_conversational_prompts(collection_router=collection_router)
     return feature_collection, summary
 
 
