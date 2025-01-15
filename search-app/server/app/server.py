@@ -204,9 +204,9 @@ async def call_graph(request: Request, response: Response, query_data: Query):
                     return {"messages": [AIMessage(content="Okay, let's start a new search. What kind of data are you looking for?")]}
 
                 else:
-                    return {"messages": "No previous chat history"}
+                    return {"messages": ["No previous chat history"]}
             else:
-                return {"messages": "No previous chat history"}
+                return {"messages": ["No previous chat history"]}
 
     print(f"-#-#--Running graph---- Using session_id: {thread_id}")
     inputs = {"messages": [HumanMessage(content=query_data.query)]}
