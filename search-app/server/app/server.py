@@ -41,8 +41,9 @@ COOKIE_NAME = "search_app-session"
 
 # Define the origins that should be allowed to make requests to your API
 origins = [
-    "http://localhost",
-    "http://localhost:5173",
+    "*",
+    # "http://localhost",
+    # "http://localhost:5173",
 ]
 
 # Init memory:
@@ -227,7 +228,7 @@ async def fetch_documents(request: Request, indexing: bool = True, api_key: APIK
         res_pygeoapi = request.app.state.indexes["pygeoapi"]._index(documents=pygeoapi_docs)
 
         # In case the collection changes significantly, also update the custom prompts
-        if (res_pygeoapi["num_added"] > 20) or (res_pygeoapi["updated"] > 20):
+        if (res_pygeoapi["num_added"] > 20) or (res_pygeoapi["num_updated"] > 20):
             collection_router.setup()
             load_conversational_prompts(collection_router=collection_router)
 
@@ -271,8 +272,8 @@ def generate_combined_feature_collection(doc_list: List[Document]):
 
 
 @app.get("/retrieve_geojson")
-async def retrieve_geojson(query: str):
-    features = indexes['geojson'].retriever.invoke(query)
+async def retrieve_geojson(request: Request, query: str):
+    features = request.app.state.indexes['geojson'].retriever.invoke(query)
 
     feature_collection = generate_combined_feature_collection(features)
 
