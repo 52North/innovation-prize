@@ -81,6 +81,7 @@ class PyGeoAPI:
                          metadata={"id": doc["id"],
                                    "title": doc["title"],
                                    "url": f"{base_url}/collections/{doc['id']}",
+                                   "source": f"{base_url}/collections/{doc['id']}",
                                    "extent": str(doc["extent"])}) for doc in collections]
         return docs
 

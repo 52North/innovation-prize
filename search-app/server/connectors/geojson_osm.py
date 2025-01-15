@@ -197,6 +197,8 @@ class GeoJSON():
             description = self._get_feature_description(feature)
             page_content = f"Name: {name}\n\n{description}"
             metadata = {
+                "id": str(feature["id"]),
+                "source": "Feature collection hosted from local GeoJSON",
                 "type": properties.get(self.tag_name, "Unknown"),
                 "feature": json.dumps(feature["geometry"] , indent=2),
                 # "url": str(properties.get("id", "url"))
@@ -221,7 +223,7 @@ class GeoJSON():
                 "tag": tag,
                 "count": len(features),
                 "features": self._convert_to_geojson(features),
-                "url": source  # Update this with the actual URL if needed
+                "source": source  # Update this with the actual URL if needed
             }
             tag_docs.append(Document(page_content=page_content, metadata=metadata))
 
