@@ -3,6 +3,11 @@
     "TAVILY_API_KEY": "",
     "GROQ_API_KEY": "",
     "SDSA_API_KEY": "demo-api-key",
+    "llm": {
+        "provider": "openai",
+        "model_name": "gpt-4o-mini",
+        "temperature": 0
+    },
     "pygeoapi_instances": [
         {"url": "https://api.weather.gc.ca/", 
         "exclude_collections": [

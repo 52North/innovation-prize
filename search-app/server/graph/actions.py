@@ -23,25 +23,29 @@ from semantic_router.encoders import OpenAIEncoder
 from semantic_router.layer import RouteLayer
 import os
 from langchain_groq import ChatGroq
+from app.llm_manager import LLMManager
+
+llm = LLMManager.get_llm()
 
 from config.config import CONFIG
 
 
-llm = ChatGroq(
-    model="llama3-70b-8192",
-    temperature=0,
-    max_tokens=None,
-    timeout=None,
-    max_retries=2,
-    # other params...
-)
+# llm = ChatGroq(
+#     model="llama3-70b-8192",
+#     temperature=0,
+#     max_tokens=None,
+#     timeout=None,
+#     max_retries=2,
+#     # other params...
+# )
+
 # llm = ChatOpenAI(model="gpt-3.5-turbo-0125")
 
 # llm_with_structured_output = ChatOpenAI(model="gpt-3.5-turbo-0125",
 #                  model_kwargs={ "response_format": { "type": "json_object" } })
 
-llm_unstructured = OpenAI(temperature=0, openai_api_key=CONFIG.openai_api_key)
-final_answer_llm = OpenAI(temperature=0, openai_api_key=CONFIG.openai_api_key)
+# llm_unstructured = OpenAI(temperature=0, openai_api_key=CONFIG.openai_api_key)
+# final_answer_llm = OpenAI(temperature=0, openai_api_key=CONFIG.openai_api_key)
 
 def is_valid_json(myjson):
     try:
@@ -176,6 +180,8 @@ def generate_search_tool(coll_dict):
 @tool("spatial_context_extraction_tool")
 def spatial_context_extraction_tool(query: str):
     """This tool extracts the spatial entities, scale and extent of a query"""
-    chain = generate_spatial_context_chain(llm=llm_unstructured)
+    # chain = generate_spatial_context_chain(llm=llm_unstructured)
+    chain = generate_spatial_context_chain(llm=llm)
 
     return chain.invoke({"query": query})
+

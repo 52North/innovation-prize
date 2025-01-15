@@ -10,13 +10,17 @@ from semantic_router import Route
 from semantic_router.layer import RouteLayer
 from semantic_router.encoders import OpenAIEncoder
 from loguru import logger
+from app.llm_manager import LLMManager
 
 from config.config import CONFIG
+
 
 class CollectionRouter():
     def __init__(self):
         self.database_dir = CONFIG.database_dir
-        self.llm = ChatOpenAI(model="gpt-4o-mini")
+        
+        self.llm = LLMManager.get_llm()
+        # self.llm = ChatOpenAI(model="gpt-4o-mini")
         self.encoder = OpenAIEncoder()
         self.setup()
 

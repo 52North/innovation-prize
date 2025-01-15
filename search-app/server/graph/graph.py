@@ -13,12 +13,12 @@ from .actions import (
     run_converstation_chain,
     final_answer_chain,
     generate_search_tool,
-    spatial_context_extraction_tool,
     check_if_conversational
 )
+
 import asyncio
 from contextlib import asynccontextmanager
-from .spatial_utilities import check_within_bbox
+from .spatial_utilities import check_within_bbox, spatial_context_extraction_tool
 from loguru import logger
 import ast
 from functools import lru_cache
@@ -188,21 +188,28 @@ class SpatialRetrieverGraph(StateGraph):
             temporal_extent = spatio_temporal_context.get('temporal', "")
 
         if not spatio_temporal_context:
-            spatial_context_str = await spatial_context_extraction_tool.ainvoke(
+            spatial_context = await spatial_context_extraction_tool.ainvoke(
                 {"query": str(state['search_criteria'])})
-
+            
             logger.info(
-                f"Automatically derived spatial context: {spatial_context_str}")
+                 f"Automatically derived spatial context: {spatial_context}")
+            
+            spatial_extent = spatial_context.get("extent", [])
+            # spatial_context_str = await spatial_context_extraction_tool.ainvoke(
+            #     {"query": str(state['search_criteria'])})
 
-            try:
-                spatial_extent_dict = ast.literal_eval(spatial_context_str)
-                if spatial_extent_dict:
-                    spatial_extent = spatial_extent_dict.get("extent", [])
-                else:
-                    spatial_extent = []
-            except (ValueError, SyntaxError) as e:
-                logger.debug(f"could not extract spatial context: {str(e)}")
-                spatial_extent = []
+            # logger.info(
+            #     f"Automatically derived spatial context: {spatial_context_str}")
+
+            # try:
+            #     spatial_extent_dict = ast.literal_eval(spatial_context_str)
+            #     if spatial_extent_dict:
+            #         spatial_extent = spatial_extent_dict.get("extent", [])
+            #     else:
+            #         spatial_extent = []
+            # except (ValueError, SyntaxError) as e:
+            #     logger.debug(f"could not extract spatial context: {str(e)}")
+            #     spatial_extent = []
 
             state['spatio_temporal_context'] = spatial_extent
 
@@ -250,7 +257,7 @@ class SpatialRetrieverGraph(StateGraph):
     async def final_answer(self, state: State):
         async with self.session() as session:
             search_index_info = next(
-                (c for c in self.collection_info_dict if c['collection_name'] == state['index_name']), None)
+                (c for c in self.collection_info_dict if c['collection_name'] == state.get('index_name')), None)
             if search_index_info:
                 search_index_info = search_index_info.copy()
                 search_index_info.pop('sample_docs', None)
