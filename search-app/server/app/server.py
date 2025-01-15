@@ -44,9 +44,10 @@ COOKIE_NAME = "search_app-session"
 
 # Define the origins that should be allowed to make requests to your API
 origins = [
-    "*",
-    # "http://localhost",
-    # "http://localhost:5173",
+    "http://localhost",
+    "http://localhost:5173",
+    "http://localhost:8080",
+    "http://localhost:3000",
 ]
 
 # Init memory:
@@ -153,7 +154,7 @@ async def _create_session(request: Request, response: Response):
 
     global state_session_to_graph
     state_session_to_graph.update({session_id: data})
-    response.set_cookie(key=COOKIE_NAME, value=session_id)
+    response.set_cookie(key=COOKIE_NAME, value=session_id, samesite=None, secure=True)
     return session_id
 
 @app.post("/create_session")
