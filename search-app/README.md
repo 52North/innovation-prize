@@ -5,8 +5,8 @@ You have multiple options to start the application:
 1. Docker compose setup
 1. Local [devcontainer](https://containers.dev/) setup
 1. Start components separately
-  - Start python module to run the backend
-  - Start the demo client via `npm`
+   - Start python module to run the backend
+   - Start the demo client via `npm`
 
 Refer to the corresponding sections below, how to start.
 Once started, you will see
