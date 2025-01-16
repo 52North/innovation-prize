@@ -2,10 +2,11 @@
 
 You have multiple options to start the application:
 
-1. Docker compose setup via `docker compose up -d`
-1. Local [devcontainer](https://containers.dev/) setup (see vscode [Dev Container plugin](https://code.visualstudio.com/docs/devcontainers/containers))
-1. Start python module to run the backend
-1. Start the demo client via `npm`
+1. Docker compose setup
+1. Local [devcontainer](https://containers.dev/) setup
+1. Start components separately
+  - Start python module to run the backend
+  - Start the demo client via `npm`
 
 Refer to the corresponding sections below, how to start.
 Once started, you will see
@@ -14,7 +15,7 @@ Once started, you will see
 INFO:     Application startup complete.
 ```
 
-Now, you can create the embeddings via API.
+Now, you can [create the embeddings via API](#create-embeddings-via-api).
 
 
 ## Start Docker Compose
