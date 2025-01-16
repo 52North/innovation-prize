@@ -21,3 +21,7 @@ Start the app with
 ```bash
 npm run dev
 ```
+
+The application will connect backend API http://localhost:8000 by default.
+To connect a different backend, copy `sample.env` to `.env` and configure `VUE_APP_BACKEND_API_URL`.
+If necessary to connect a backend which is not served samesite, make sure the backend [allows cross site requests](https://enable-cors.org/).

@@ -1,36 +1,73 @@
 # Geospatial Data Search App
 
-## Project description
-...
-### Component Overview
-<img src="../assets/Server_Architecture.png" width=70% height=70%>
+SDSA (Spatial Data Search Assistant) is a server-based application designed to facilitate the development of an advanced search system for geospatial data.
+Leveraging cutting-edge Large Language Models (LLMs), it enables a search capability that surpasses conventional methods found in metadata catalogs.
+
+This README gives you a quick startup guide.
+Refer to [SDSA documentaion](https://sdsadocs.readthedocs.io/) for more in-depth documentation.
+
 
 ## Installation
 
-Install the LangChain CLI if you haven't yet
+Ensure you have [poetry](https://python-poetry.org/) installed: 
 
 ```bash
-pip install -U langchain-cli
+sudo apt-get update
+sudo apt-get install python3-poetry
 ```
 
-This project uses python poetry dependency manager to install dependencies. If you haven't yet installed: 
+> :bulb: Poetry Version
+> 
+> Make sure you have the right poetry version installed.
+> For older distributions you may want to use `pipx`:
+> 
+> ```sh
+> apt-get install pipx
+> pipx install poetry
+> pipx run poetry --version
+> ```
+>
+> You also may want to ensure all pipx installed tooling is available from your `PATH`:
+> 
+> ```
+> pipx ensurepath
+> su -l
+> ```
+
+Clone this repository:
+
 ```bash
-sudo apt install python3-poetry
+git clone https://github.com/52North/innovation-prize -b dev
 ```
 
-Then you can install all dependencies using
+Switch into the `./search-app/server` directory within the working copy you just cloned:
+
 ```bash
-poetry install
+cd innovation-prize/search-app/server
+poetry install --with=dev
 ```
+
 ## Configuration
-:warning: This app must be configured in order to work properly.
+
+> :warning: This app must be configured in order to work properly.
+
 There are a few steps required:
-1. **Add API-keys** (e.g. OPENAI-API-KEY) to the [config file](./config/config.json)
-2. **Add connectors**: So far, it is possible to connect to a pygeoapi instance and then index collections of the instance. To add a pygeoapi instance, An entry is necessary in the  [config file](./config/config.json) like: ```"pygeoapi_instances": 
-["https://api.weather.gc.ca/", 
-...]```
-4. **Index collections of pygeoapi instance**: To enable contextual search, you need to first index the collections from the specified pygeoapi instance. This is done using a local vector store called ([ChromaDB](https://docs.trychroma.com/)). Once the collections are indexed, the retrieval module performs a semantic search on the indexed metadata.
-To start the indexing process, the app provides an endpoint: ```GET /fetch_documents```. By calling this endpoint, the app synchronizes with the pygeoapi instances specified in the config file. A record manager is used to prevent duplicate entries in the index and to remove indexed documents that are no longer available from the pygeoapi server. 
+
+1. **API keys**: 
+   Can be provided via `.env` or [config file](./config/config.json)
+2. **Data connectors**: 
+   So far, it is possible to connect to a pygeoapi instance and then index collections of the instance.
+   To add a pygeoapi instance, an entry is necessary in the  [config file](./config/config.json) like:
+    ```
+    "pygeoapi_instances": [
+      "https://api.weather.gc.ca/",
+    ]
+    ```
+4. **Index data collections**
+   To enable contextual search, you need to first index the collections from connector instance.
+   This is done using a local vector store called ([ChromaDB](https://docs.trychroma.com/)).
+   Once the collections are indexed, the retrieval module performs a semantic search on the indexed metadata.
+   
 
 ## Launch Application
 ```bash
@@ -40,44 +77,56 @@ cd search-app/server
 # launch application
 langchain serve --port=8000
 ```
+
+## Indexing Collections
+
+To start the indexing process, the app provides index endpoints:
+
+- ```GET /fetch_documents``` for pygeoapi connectors
+- ```GET /index_geojson_osm_features``` a demo connector for local geojson files
+
+By calling these endpoints, the app synchronizes with the data endpoints specified in the config file.
+
+> :bulb: **Note**
+>
+> To protect these endpoints you need to set the HTTP header `x-api-key`:
+>
+> ```
+> curl -H "x-api-key: api-demo-key" http://localhost:8000/fetch_documents
+> ```
+>
+> You can configure the API key via `.env` or [config file](./config/config.json).
+
+A record manager is used to prevent duplicate entries in the index.
+Also, it removes indexed documents that became unavailable.
+
+
 ## API Endpoints
-- Once the server is launched, a Swagger documentation is generated on ```<server-ip>:8000/docs```.
-- :warning: Due to the Pydantic version used by Langserve, OpenAPI docs for `invoke`, `batch`, `stream`, `stream_log` endpoints will not be generated. API endpoints and playground should work as expected. If you need to see the docs, you can downgrade to Pydantic 1. For example, `pip install pydantic==1.10.13`. See [this issue](https://github.com/tiangolo/fastapi/issues/10360) for details.
-- The endpoints not included in the Swagger docs are:
-    - ```/data/invoke``` => Conversational module (search for data with chat)
-        ```bash
-        curl -X POST http://<server-ip>:8000/data/invoke -H "Content-Type: application/json" -d '{"input": "Your query here"}'
-        ```
-    - ```/retrieve_pygeoapi/invoke``` => Execute retrieval module without chat functionality
-        ```bash
-        curl -X POST http://<server-ip>:8000/retrieve_pygeoapi/invoke -H "Content-Type: application/json" -d '{"input": "Your query here"}'
-        ```
 
-## Adding packages
+Once the server is launched, a Swagger documentation is generated on `http://localhost:8000/docs`.
 
-```bash
-# adding packages from 
-# https://github.com/langchain-ai/langchain/tree/master/templates
-langchain app add $PROJECT_NAME
+> :warning: Due to the Pydantic version used by Langserve, OpenAPI docs for `invoke`, `batch`, `stream`, `stream_log` endpoints will not be generated.
+> However, API endpoints and playground should work as expected.
+> If you need to see the docs, you can downgrade to Pydantic v1.
+> For example, `pip install pydantic==1.10.13`.
+> See [this issue](https://github.com/tiangolo/fastapi/issues/10360) for details.
 
-# adding custom GitHub repo packages
-langchain app add --repo $OWNER/$REPO
-# or with whole git string (supports other git providers):
-# langchain app add git+https://github.com/hwchase17/chain-of-verification
+The endpoints not included in the Swagger docs are:
 
-# with a custom api mount point (defaults to `/{package_name}`)
-langchain app add $PROJECT_NAME --api_path=/my/custom/path/rag
-```
+- `/data/invoke` => Conversational module (search for data with chat)
+  ```bash
+  curl -X POST http://localhost:8000/data/invoke -H "Content-Type: application/json" -d '{"input": "Your query here"}'
+  ```
+- `/retrieve_pygeoapi/invoke` => Execute retrieval module without chat functionality
+  ```bash
+  curl -X POST http://localhost:8000/retrieve_pygeoapi/invoke -H "Content-Type: application/json" -d '{"input": "Your query here"}'
+  ```
 
-Note: you remove packages by their api path
-
-```bash
-langchain app remove my/custom/path/rag
-```
 
 ## Running in Docker
 
 This project folder includes a Dockerfile that allows you to easily build and host your LangServe app.
+Also, you may want to build and start via [docker compose setup](../compose.yml), which starts a demo client.
 
 ### Building the Image
 
@@ -90,16 +139,12 @@ docker build . -t my-langserve-app
 If you tag your image with something other than `my-langserve-app`,
 note it for use in the next step.
 
+
 ### Running the Image Locally
 
-To run the image, you'll need to include any environment variables
-necessary for your application.
+To run the image, you'll need to include any environment variables necessary for your application.
 
-In the below example, we inject the `OPENAI_API_KEY` environment
-variable with the value set in my local environment
-(`$OPENAI_API_KEY`)
-
-We also expose port 8080 with the `-p 8080:8080` option.
+In the below example, we set the `OPENAI_API_KEY` environment variable via local environment and [map to local port](https://docs.docker.com/get-started/docker-concepts/running-containers/publishing-ports/) `8080`.
 
 ```shell
 docker run -e OPENAI_API_KEY=$OPENAI_API_KEY -p 8080:8080 my-langserve-app
