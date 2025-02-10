@@ -13,7 +13,7 @@ is generally limited to a metadata-based approach. However, geospatial data - wh
 provide a lot of interesting data that currently can only be identified by
 looking at the individual dataset. The challenge of this year's Innovation Prize is to
 develop a concept and a possible implementation that allows searching within datasets of/and RDI/SDI, 
-e.g. on the attribute level. Many interesting aspects have to be considered: techical solutions, taxonomies and semantics, language/i18n, searching in raster data,
+e.g. on the attribute level. Many interesting aspects have to be considered: technical solutions, taxonomies and semantics, language/i18n, searching in raster data,
 and many more.
 
 The software engineers at 52°North have preprared a set of user stories and features that
