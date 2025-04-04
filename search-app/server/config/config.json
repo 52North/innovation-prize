@@ -28,7 +28,10 @@
     "web_geojson_resources": [
         "https://webais.demo.52north.org/pygeoapi",
         "https://www.openstreetmap.org",  
-        "https://www.naturalearthdata.com" 
+        "https://www.naturalearthdata.com",
+        "https://www.weather.gov/documentation/services-web-api",
+        "https://wis2node.nws.noaa.gov/" 
+
     ],
     "local_geojson_files": [
         "./data/"
