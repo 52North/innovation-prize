@@ -1,0 +1,2 @@
+Here is a GeoJSON file. Can you describe what geographic features it contains and what kind of application it might be useful for?
+
