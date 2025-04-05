@@ -1,0 +1,23 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Sample Park"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [77.5946, 12.9716],
+            [77.5956, 12.9716],
+            [77.5956, 12.9726],
+            [77.5946, 12.9726],
+            [77.5946, 12.9716]
+          ]
+        ]
+      }
+    }
+  ]
+}
