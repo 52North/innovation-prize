@@ -23,16 +23,27 @@
         {
             "url": "https://reference.geoconnex.us",
             "exclude_collections": []
+        },
+        {
+            "url": "https://www.openstreetmap.org", 
+            "exclude_collections": []
+        },
+        {
+            "url": "https://www.naturalearthdata.com",
+            "exclude_collections": []
+        },
+        {
+            "url": "https://www.weather.gov/documentation/services-web-api", 
+            "exclude_collections": []
+        },
+        {
+            "url": "https://wis2node.nws.noaa.gov/" , 
+            "exclude_collections": []
         }
     ],
     "web_geojson_resources": [
-        "https://webais.demo.52north.org/pygeoapi",
-        "https://www.openstreetmap.org",  
-        "https://www.naturalearthdata.com",
-        "https://www.weather.gov/documentation/services-web-api",
-        "https://wis2node.nws.noaa.gov/" 
-
-    ],
+        "https://webais.demo.52north.org/pygeoapi"
+        ],
     "local_geojson_files": [
         "./data/"
     ]
