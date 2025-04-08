@@ -33,7 +33,7 @@
             "exclude_collections": []
         },
         {
-            "url": "https://www.weather.gov/documentation/services-web-api", 
+            "url": "https://api.weather.gov", 
             "exclude_collections": []
         },
         {
