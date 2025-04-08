@@ -23,11 +23,27 @@
         {
             "url": "https://reference.geoconnex.us",
             "exclude_collections": []
+        },
+        {
+            "url": "https://www.openstreetmap.org", 
+            "exclude_collections": []
+        },
+        {
+            "url": "https://www.naturalearthdata.com",
+            "exclude_collections": []
+        },
+        {
+            "url": "https://api.weather.gov", 
+            "exclude_collections": []
+        },
+        {
+            "url": "https://wis2node.nws.noaa.gov/" , 
+            "exclude_collections": []
         }
     ],
     "web_geojson_resources": [
         "https://webais.demo.52north.org/pygeoapi"
-    ],
+        ],
     "local_geojson_files": [
         "./data/"
     ]
